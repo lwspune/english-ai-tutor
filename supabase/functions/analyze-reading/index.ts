@@ -8,7 +8,9 @@ const corsHeaders = {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
+  try {
   const { audioPath, passageText, studentId, passageId } = await req.json()
+  console.log('Starting analysis:', { audioPath, studentId, passageId })
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
@@ -19,7 +21,11 @@ Deno.serve(async (req) => {
   const { data: audioData, error: dlError } = await supabase.storage
     .from('audio')
     .download(audioPath)
-  if (dlError) return new Response(JSON.stringify({ error: dlError.message }), { status: 500, headers: corsHeaders })
+  if (dlError) {
+    console.error('Storage download error:', dlError)
+    return new Response(JSON.stringify({ error: dlError.message }), { status: 500, headers: corsHeaders })
+  }
+  console.log('Audio downloaded, size:', audioData.size)
 
   // Transcribe with Whisper
   const formData = new FormData()
@@ -33,7 +39,13 @@ Deno.serve(async (req) => {
     headers: { Authorization: `Bearer ${Deno.env.get('OPENAI_API_KEY')}` },
     body: formData,
   })
+  if (!whisperRes.ok) {
+    const errText = await whisperRes.text()
+    console.error('Whisper API error:', whisperRes.status, errText)
+    return new Response(JSON.stringify({ error: `Whisper error: ${errText}` }), { status: 500, headers: corsHeaders })
+  }
   const whisperData = await whisperRes.json()
+  console.log('Whisper response:', { text: whisperData.text?.slice(0, 100), duration: whisperData.duration })
 
   const transcript: string = whisperData.text ?? ''
   const durationSeconds: number = whisperData.duration ?? 0
@@ -82,9 +94,16 @@ Deno.serve(async (req) => {
     .select()
     .single()
 
-  if (dbError) return new Response(JSON.stringify({ error: dbError.message }), { status: 500, headers: corsHeaders })
+  if (dbError) {
+    console.error('DB insert error:', dbError)
+    return new Response(JSON.stringify({ error: dbError.message }), { status: 500, headers: corsHeaders })
+  }
 
   return new Response(JSON.stringify({ sessionId: session.id }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   })
+  } catch (err) {
+    console.error('Unhandled error:', err)
+    return new Response(JSON.stringify({ error: String(err) }), { status: 500, headers: corsHeaders })
+  }
 })

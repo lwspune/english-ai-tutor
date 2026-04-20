@@ -2,6 +2,17 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Development Preferences
+
+### UI
+- All student-facing screens must be mobile-first. Use Tailwind responsive prefixes (`sm:`, `md:`) and test layouts at 375px width. Touch targets must be at least 44px. Avoid horizontal scroll.
+
+### Testing
+- Follow test-first (TDD): write or update tests before writing implementation code. Do not write implementation until the test exists and fails for the right reason.
+
+### Planning
+- For any new feature or non-trivial edit, always analyze and present a plan first. Get confirmation before writing any code.
+
 ## Commands
 
 ```bash

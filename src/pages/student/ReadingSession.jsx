@@ -12,7 +12,8 @@ export default function ReadingSession() {
   const [aiFeedbackEnabled, setAiFeedbackEnabled] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
-  const { recording, audioBlob, autoStopped, remaining, startRecording, stopRecording, reset } = useAudioRecorder()
+  const maxDurationSec = passage ? Math.max(60, Math.round(passage.word_count / 70 * 60 * 1.5)) : 180
+  const { recording, audioBlob, autoStopped, remaining, startRecording, stopRecording, reset } = useAudioRecorder(maxDurationSec)
 
   useEffect(() => {
     async function load() {

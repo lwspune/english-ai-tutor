@@ -1,8 +1,6 @@
 import { useRef, useState, useEffect } from 'react'
 
-const MAX_DURATION_MS = 3 * 60 * 1000 // 3 minutes
-
-export function useAudioRecorder() {
+export function useAudioRecorder(maxDurationSec = 180) {
   const [recording, setRecording] = useState(false)
   const [audioBlob, setAudioBlob] = useState(null)
   const [autoStopped, setAutoStopped] = useState(false)
@@ -40,14 +38,14 @@ export function useAudioRecorder() {
     setRecording(true)
     setAudioBlob(null)
 
-    // Auto-stop at 3 minutes
+    // Auto-stop at passage-based limit
     autoStopTimerRef.current = setTimeout(() => {
       if (mediaRecorderRef.current?.state === 'recording') {
         mediaRecorderRef.current.stop()
         setRecording(false)
         setAutoStopped(true)
       }
-    }, MAX_DURATION_MS)
+    }, maxDurationSec * 1000)
 
     // Tick elapsed seconds for UI countdown
     elapsedTimerRef.current = setInterval(() => {
@@ -69,7 +67,7 @@ export function useAudioRecorder() {
     setElapsed(0)
   }
 
-  const remaining = Math.max(0, 180 - elapsed) // seconds left of 3 min
+  const remaining = Math.max(0, maxDurationSec - elapsed)
 
   return { recording, audioBlob, autoStopped, elapsed, remaining, startRecording, stopRecording, reset }
 }

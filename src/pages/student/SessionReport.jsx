@@ -2,13 +2,16 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 
-function ScoreRing({ value, label, color }) {
+const WPM_TARGETS = { 9: 140, 10: 150, 11: 160, 12: 170 }
+
+function ScoreRing({ value, label, color, sub }) {
   return (
     <div className="flex flex-col items-center gap-1">
       <div className={`w-20 h-20 rounded-full border-4 ${color} flex items-center justify-center`}>
         <span className="text-xl font-bold text-gray-800">{value}</span>
       </div>
       <span className="text-xs text-gray-500">{label}</span>
+      {sub && <span className="text-xs text-gray-400">{sub}</span>}
     </div>
   )
 }
@@ -17,14 +20,25 @@ export default function SessionReport() {
   const { sessionId } = useParams()
   const navigate = useNavigate()
   const [session, setSession] = useState(null)
+  const [grade, setGrade] = useState(null)
 
   useEffect(() => {
-    supabase
-      .from('sessions')
-      .select('*, passages(title, content)')
-      .eq('id', sessionId)
-      .single()
-      .then(({ data }) => setSession(data))
+    async function load() {
+      const { data: s } = await supabase
+        .from('sessions')
+        .select('*, passages(title, content)')
+        .eq('id', sessionId)
+        .single()
+      setSession(s)
+
+      const { data: p } = await supabase
+        .from('profiles')
+        .select('grade')
+        .eq('id', s?.student_id)
+        .single()
+      setGrade(p?.grade ?? null)
+    }
+    load()
   }, [sessionId])
 
   if (!session) {
@@ -36,7 +50,16 @@ export default function SessionReport() {
   }
 
   const words = session.word_results ?? []
-  const passageWords = session.passages.content.split(/\s+/)
+  const wpmTarget = WPM_TARGETS[grade] ?? 150
+  const wpmDiff = session.score_wpm - wpmTarget
+  const wpmSub = wpmDiff >= 0
+    ? `+${wpmDiff} above target`
+    : `${Math.abs(wpmDiff)} below target (${wpmTarget})`
+  const wpmColor = Math.abs(wpmDiff) <= 15 ? 'border-green-500' : wpmDiff < 0 ? 'border-yellow-500' : 'border-blue-500'
+
+  const omissions = session.count_omissions ?? words.filter(w => w.status === 'omission').length
+  const substitutions = session.count_substitutions ?? words.filter(w => w.status === 'substitution').length
+  const phrasing = session.score_phrasing ?? session.score_fluency ?? 0
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -46,42 +69,73 @@ export default function SessionReport() {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+        {/* Scores */}
         <div className="bg-white rounded-2xl border border-gray-200 p-5">
           <p className="text-xs text-gray-400 mb-1">{new Date(session.created_at).toLocaleString()}</p>
-          <h2 className="text-base font-semibold text-gray-800 mb-4">{session.passages.title}</h2>
+          <h2 className="text-base font-semibold text-gray-800 mb-5">{session.passages.title}</h2>
 
           <div className="flex justify-around">
-            <ScoreRing value={`${session.score_accuracy}%`} label="Accuracy" color="border-blue-500" />
-            <ScoreRing value={session.score_wpm} label="WPM" color="border-green-500" />
-            <ScoreRing value={`${session.score_fluency}%`} label="Fluency" color="border-purple-500" />
+            <ScoreRing
+              value={`${session.score_accuracy}%`}
+              label="Accuracy"
+              color="border-blue-500"
+            />
+            <ScoreRing
+              value={session.score_wpm}
+              label="Pace (WPM)"
+              color={wpmColor}
+              sub={wpmSub}
+            />
+            <ScoreRing
+              value={`${phrasing}%`}
+              label="Phrasing"
+              color="border-purple-500"
+            />
+          </div>
+
+          {/* Error summary */}
+          <div className="mt-5 flex justify-center gap-6 text-sm text-gray-600">
+            <span>
+              <span className="font-semibold text-red-500">{omissions}</span> skipped
+            </span>
+            <span>
+              <span className="font-semibold text-amber-500">{substitutions}</span> substituted
+            </span>
           </div>
         </div>
 
+        {/* Word-by-word */}
         <div className="bg-white rounded-2xl border border-gray-200 p-5">
           <h3 className="text-sm font-semibold text-gray-700 mb-3">Word-by-Word Analysis</h3>
           <div className="flex flex-wrap gap-1.5">
-            {passageWords.map((word, i) => {
-              const result = words[i]
-              const clean = word.replace(/[^a-zA-Z]/g, '').toLowerCase()
-              const status = result?.status ?? 'unknown'
-              const colorClass = status === 'correct' ? 'bg-green-100 text-green-800'
-                : status === 'mispronounced' ? 'bg-yellow-100 text-yellow-800'
-                : status === 'skipped' ? 'bg-red-100 text-red-800'
-                : 'bg-gray-100 text-gray-600'
+            {words.map((result, i) => {
+              const colorClass =
+                result.status === 'correct'       ? 'bg-green-100 text-green-800' :
+                result.status === 'substitution'  ? 'bg-amber-100 text-amber-800' :
+                result.status === 'omission'      ? 'bg-red-100 text-red-800'
+                                                  : 'bg-gray-100 text-gray-600'
+              const title = result.status === 'substitution' && result.spoken
+                ? `Said: "${result.spoken}"`
+                : undefined
               return (
-                <span key={i} className={`px-2 py-0.5 rounded text-sm font-medium ${colorClass}`}>
-                  {word}
+                <span
+                  key={i}
+                  title={title}
+                  className={`px-2 py-0.5 rounded text-sm font-medium ${colorClass}`}
+                >
+                  {result.word}
                 </span>
               )
             })}
           </div>
           <div className="flex gap-4 mt-4 text-xs text-gray-500">
             <span><span className="inline-block w-3 h-3 rounded bg-green-200 mr-1" />Correct</span>
-            <span><span className="inline-block w-3 h-3 rounded bg-yellow-200 mr-1" />Mispronounced</span>
+            <span><span className="inline-block w-3 h-3 rounded bg-amber-200 mr-1" />Substituted</span>
             <span><span className="inline-block w-3 h-3 rounded bg-red-200 mr-1" />Skipped</span>
           </div>
         </div>
 
+        {/* Feedback */}
         {session.feedback && (
           <div className="bg-blue-50 rounded-2xl border border-blue-100 p-5">
             <h3 className="text-sm font-semibold text-blue-800 mb-2">Feedback</h3>

@@ -33,11 +33,9 @@ export default function ReadingSession() {
       const { data: { publicUrl } } = supabase.storage.from('audio').getPublicUrl(filename)
 
       const { data, error: fnError } = await supabase.functions.invoke('analyze-reading', {
-        body: { audioPath: filename, passageText: passage.content, studentId: profile.id, passageId },
+        body: { audioPath: filename, passageText: passage.content, studentId: profile.id, passageId, grade: profile.grade },
       })
       if (fnError) throw fnError
-
-      await supabase.storage.from('audio').remove([filename])
 
       navigate(`/student/report/${data.sessionId}`)
     } catch (err) {

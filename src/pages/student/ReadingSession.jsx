@@ -12,7 +12,7 @@ export default function ReadingSession() {
   const [aiFeedbackEnabled, setAiFeedbackEnabled] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
-  const { recording, audioBlob, startRecording, stopRecording, reset } = useAudioRecorder()
+  const { recording, audioBlob, autoStopped, remaining, startRecording, stopRecording, reset } = useAudioRecorder()
 
   useEffect(() => {
     async function load() {
@@ -43,7 +43,10 @@ export default function ReadingSession() {
       const { data, error: fnError } = await supabase.functions.invoke('analyze-reading', {
         body: { audioPath: filename, passageText: passage.content, studentId: profile.id, passageId, grade: profile.grade, aiFeedbackEnabled },
       })
-      if (fnError) throw fnError
+      if (fnError) {
+        const msg = data?.error || fnError.message
+        throw new Error(msg)
+      }
 
       navigate(`/student/report/${data.sessionId}`)
     } catch (err) {
@@ -74,8 +77,17 @@ export default function ReadingSession() {
 
         <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-4">
           <p className="text-sm font-medium text-gray-700 text-center">
-            {recording ? 'Recording... read the passage aloud' : audioBlob ? 'Recording complete' : 'Press Start when ready to read'}
+            {recording
+              ? `Recording... read the passage aloud`
+              : autoStopped ? 'Recording stopped — 3 minute limit reached'
+              : audioBlob ? 'Recording complete'
+              : 'Press Start when ready to read'}
           </p>
+          {recording && (
+            <p className={`text-xs text-center ${remaining <= 30 ? 'text-red-500 font-semibold' : 'text-gray-400'}`}>
+              {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')} remaining
+            </p>
+          )}
 
           <div className="flex gap-3 justify-center">
             {!recording && !audioBlob && (

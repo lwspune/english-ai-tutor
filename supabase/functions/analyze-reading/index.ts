@@ -199,6 +199,20 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     )
 
+    // Guardrail 1: max 3 attempts per passage per student
+    const { count: attemptCount } = await supabase
+      .from('sessions')
+      .select('*', { count: 'exact', head: true })
+      .eq('student_id', studentId)
+      .eq('passage_id', passageId)
+    if ((attemptCount ?? 0) >= 3) {
+      await supabase.storage.from('audio').remove([audioPath])
+      return new Response(
+        JSON.stringify({ error: 'You have reached the maximum of 3 attempts for this passage.' }),
+        { status: 429, headers: corsHeaders },
+      )
+    }
+
     // Download audio
     const { data: audioData, error: dlError } = await supabase.storage
       .from('audio')
@@ -206,6 +220,15 @@ Deno.serve(async (req) => {
     if (dlError) {
       console.error('Storage download error:', dlError)
       return new Response(JSON.stringify({ error: dlError.message }), { status: 500, headers: corsHeaders })
+    }
+
+    // Guardrail 2: min audio size (~5s of WebM ≈ 5 KB)
+    if (audioData.size < 5_000) {
+      await supabase.storage.from('audio').remove([audioPath])
+      return new Response(
+        JSON.stringify({ error: 'Recording is too short. Please read the full passage before submitting.' }),
+        { status: 400, headers: corsHeaders },
+      )
     }
 
     // Transcribe with Whisper
@@ -249,9 +272,13 @@ Deno.serve(async (req) => {
       .map(w => w.word.replace(/[^a-zA-Z]/g, ''))
       .filter(Boolean)
 
+    // Guardrail 3: skip GPT if transcript is too sparse (< 20% of passage words heard)
+    const transcriptCoverage = spokenWords.length / passageWords.length
+    const enoughTranscript = transcriptCoverage >= 0.2
+
     // Generate feedback
     let feedback = ''
-    if (aiFeedbackEnabled) {
+    if (aiFeedbackEnabled && enoughTranscript) {
       feedback = await buildAiFeedback(
         grade ?? 10,
         scoreAccuracy, scoreWpm, wpmTarget, scorePhrasing,

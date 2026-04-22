@@ -4,6 +4,49 @@ import { supabase } from '../../lib/supabase'
 
 const WPM_TARGETS = { 9: 140, 10: 150, 11: 160, 12: 170 }
 
+function FeedbackCard({ raw }) {
+  let ai = null
+  try { ai = JSON.parse(raw) } catch { /* plain text fallback */ }
+
+  if (ai && ai.wentWell) {
+    return (
+      <div className="bg-blue-50 rounded-2xl border border-blue-100 p-5 space-y-3">
+        <h3 className="text-sm font-semibold text-blue-800">Feedback</h3>
+        <div>
+          <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-1">What went well</p>
+          <p className="text-sm text-gray-700 leading-relaxed">{ai.wentWell}</p>
+        </div>
+        <div>
+          <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-1">Focus on</p>
+          <p className="text-sm text-gray-700 leading-relaxed">{ai.focusOn}</p>
+        </div>
+        {ai.practiseWords?.length > 0 && (
+          <div>
+            <p className="text-xs font-semibold text-red-700 uppercase tracking-wide mb-1">Words to practise</p>
+            <div className="flex flex-wrap gap-2">
+              {ai.practiseWords.map(w => (
+                <span key={w} className="px-2 py-0.5 bg-red-100 text-red-800 rounded text-sm font-medium">{w}</span>
+              ))}
+            </div>
+          </div>
+        )}
+        <div className="pt-1 border-t border-blue-100">
+          <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-1">Tip for next time</p>
+          <p className="text-sm text-blue-700 leading-relaxed">{ai.tip}</p>
+        </div>
+      </div>
+    )
+  }
+
+  // plain text fallback (rule-based or old sessions)
+  return (
+    <div className="bg-blue-50 rounded-2xl border border-blue-100 p-5">
+      <h3 className="text-sm font-semibold text-blue-800 mb-2">Feedback</h3>
+      <p className="text-sm text-blue-700 leading-relaxed">{raw}</p>
+    </div>
+  )
+}
+
 function ScoreRing({ value, label, color, sub }) {
   return (
     <div className="flex flex-col items-center gap-1">
@@ -136,12 +179,7 @@ export default function SessionReport() {
         </div>
 
         {/* Feedback */}
-        {session.feedback && (
-          <div className="bg-blue-50 rounded-2xl border border-blue-100 p-5">
-            <h3 className="text-sm font-semibold text-blue-800 mb-2">Feedback</h3>
-            <p className="text-sm text-blue-700 leading-relaxed">{session.feedback}</p>
-          </div>
-        )}
+        {session.feedback && <FeedbackCard raw={session.feedback} />}
       </main>
     </div>
   )

@@ -11,18 +11,16 @@ const normalize = (s: string) => s.toLowerCase().replace(/[^a-z]/g, '')
 const endsWithPunctuation = (s: string) => /[.,!?;:]$/.test(s.trim())
 
 // Sequence alignment: aligns spokenWords to passageWords using DP.
-// Returns one entry per passage word: correct | substitution | omission.
 function alignWords(
   passageWords: string[],
   spokenWords: string[],
 ): { word: string; spoken: string; status: 'correct' | 'substitution' | 'omission' }[] {
   const P = passageWords.length
   const S = spokenWords.length
-  const INS = 1   // penalty: spoken word with no passage match
-  const DEL = 2   // penalty: passage word not spoken (omission — heavier)
-  const SUB = 1   // penalty: wrong word spoken
+  const INS = 1
+  const DEL = 2
+  const SUB = 1
 
-  // DP cost matrix
   const dp: number[][] = Array.from({ length: P + 1 }, () => new Array(S + 1).fill(0))
   for (let i = 1; i <= P; i++) dp[i][0] = i * DEL
   for (let j = 1; j <= S; j++) dp[0][j] = j * INS
@@ -31,14 +29,13 @@ function alignWords(
     for (let j = 1; j <= S; j++) {
       const match = normalize(passageWords[i - 1]) === normalize(spokenWords[j - 1])
       dp[i][j] = Math.min(
-        dp[i - 1][j - 1] + (match ? 0 : SUB), // match or substitution
-        dp[i - 1][j] + DEL,                    // omission (passage word skipped)
-        dp[i][j - 1] + INS,                    // insertion (extra spoken word)
+        dp[i - 1][j - 1] + (match ? 0 : SUB),
+        dp[i - 1][j] + DEL,
+        dp[i][j - 1] + INS,
       )
     }
   }
 
-  // Traceback
   const results: { word: string; spoken: string; status: 'correct' | 'substitution' | 'omission' }[] = []
   let i = P, j = S
   const ops: { pi: number; si: number; op: 'match' | 'sub' | 'del' | 'ins' }[] = []
@@ -62,7 +59,6 @@ function alignWords(
   }
 
   ops.reverse()
-
   for (const op of ops) {
     if (op.op === 'match') {
       results.push({ word: passageWords[op.pi], spoken: spokenWords[op.si], status: 'correct' })
@@ -71,22 +67,18 @@ function alignWords(
     } else if (op.op === 'del') {
       results.push({ word: passageWords[op.pi], spoken: '', status: 'omission' })
     }
-    // insertions are discarded — extra spoken words don't map to a passage word
   }
 
   return results
 }
 
 // Phrasing: % of long inter-word pauses that fall at punctuation boundaries.
-// Whisper word objects: { word, start, end }
 function computePhrasingScore(
   passageWords: string[],
   whisperWords: { word: string; start: number; end: number }[],
 ): number {
   if (whisperWords.length < 2) return 0
-
-  const PAUSE_THRESHOLD = 0.4 // seconds
-
+  const PAUSE_THRESHOLD = 0.4
   let totalPauses = 0
   let punctuationPauses = 0
 
@@ -94,8 +86,6 @@ function computePhrasingScore(
     const gap = whisperWords[i + 1].start - whisperWords[i].end
     if (gap < PAUSE_THRESHOLD) continue
     totalPauses++
-
-    // Find which passage word this spoken word corresponds to (rough match)
     const spokenNorm = normalize(whisperWords[i].word)
     const matchIdx = passageWords.findIndex(pw => normalize(pw) === spokenNorm)
     if (matchIdx !== -1 && endsWithPunctuation(passageWords[matchIdx])) {
@@ -103,11 +93,12 @@ function computePhrasingScore(
     }
   }
 
-  if (totalPauses === 0) return 100 // no long pauses → smooth reading
+  if (totalPauses === 0) return 100
   return Math.round((punctuationPauses / totalPauses) * 100)
 }
 
-function buildFeedback(
+// Rule-based feedback fallback (used when AI feedback is off)
+function buildRuleFeedback(
   scoreAccuracy: number,
   scoreWpm: number,
   wpmTarget: number,
@@ -145,12 +136,63 @@ function buildFeedback(
   return lines.join(' ')
 }
 
+// AI feedback via GPT-4o-mini
+async function buildAiFeedback(
+  grade: number,
+  scoreAccuracy: number,
+  scoreWpm: number,
+  wpmTarget: number,
+  scorePhrasing: number,
+  countOmissions: number,
+  countSubstitutions: number,
+  difficultWords: string[],
+): Promise<string> {
+  const prompt = `You are an encouraging English reading coach for a Grade ${grade} high school student.
+The student just read a passage aloud. Here are their results:
+- Accuracy: ${scoreAccuracy}% (words read correctly)
+- Pace: ${scoreWpm} WPM (grade target: ${wpmTarget} WPM)
+- Phrasing: ${scorePhrasing}% (pausing at punctuation vs mid-sentence)
+- Words skipped (omissions): ${countOmissions}
+- Wrong words said (substitutions): ${countSubstitutions}
+- Difficult words: ${difficultWords.slice(0, 8).join(', ') || 'none'}
+
+Respond ONLY with a JSON object using exactly these keys:
+- "wentWell": one specific sentence on what they did well
+- "focusOn": one or two sentences on the single most important thing to improve
+- "tip": one concrete, actionable tip for their next reading session
+- "practiseWords": array of up to 5 words from the difficult words list (empty array if none)`
+
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      response_format: { type: 'json_object' },
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 300,
+      temperature: 0.7,
+    }),
+  })
+
+  if (!res.ok) {
+    const err = await res.text()
+    console.error('GPT feedback error:', err)
+    return ''
+  }
+
+  const data = await res.json()
+  return data.choices?.[0]?.message?.content ?? ''
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
-    const { audioPath, passageText, studentId, passageId, grade } = await req.json()
-    console.log('Starting analysis:', { audioPath, studentId, passageId, grade })
+    const { audioPath, passageText, studentId, passageId, grade, aiFeedbackEnabled } = await req.json()
+    console.log('Starting analysis:', { audioPath, studentId, passageId, grade, aiFeedbackEnabled })
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -165,9 +207,8 @@ Deno.serve(async (req) => {
       console.error('Storage download error:', dlError)
       return new Response(JSON.stringify({ error: dlError.message }), { status: 500, headers: corsHeaders })
     }
-    console.log('Audio downloaded, size:', audioData.size)
 
-    // Transcribe with Whisper (word-level timestamps)
+    // Transcribe with Whisper
     const formData = new FormData()
     formData.append('file', new File([audioData], 'audio.webm', { type: 'audio/webm' }))
     formData.append('model', 'whisper-1')
@@ -185,7 +226,6 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: `Whisper error: ${errText}` }), { status: 500, headers: corsHeaders })
     }
     const whisperData = await whisperRes.json()
-    console.log('Whisper response:', { text: whisperData.text?.slice(0, 100), duration: whisperData.duration })
 
     const transcript: string = whisperData.text ?? ''
     const durationSeconds: number = whisperData.duration ?? 0
@@ -194,33 +234,38 @@ Deno.serve(async (req) => {
     const passageWords = passageText.trim().split(/\s+/)
     const spokenWords = transcript.trim().split(/\s+/).filter(Boolean)
 
-    // Align spoken to passage words
     const wordResults = alignWords(passageWords, spokenWords)
 
-    // Compute metrics
     const correct = wordResults.filter(w => w.status === 'correct').length
     const countOmissions = wordResults.filter(w => w.status === 'omission').length
     const countSubstitutions = wordResults.filter(w => w.status === 'substitution').length
-
     const scoreAccuracy = Math.round((correct / passageWords.length) * 100)
     const scoreWpm = durationSeconds > 0 ? Math.round((passageWords.length / durationSeconds) * 60) : 0
     const scorePhrasing = computePhrasingScore(passageWords, whisperWords)
-
-    // WPM target for grade (default grade 10)
     const wpmTarget = WPM_TARGETS[grade as number] ?? 150
 
-    // Difficult words: passage words that weren't read correctly
     const difficultWords = wordResults
       .filter(w => w.status !== 'correct')
       .map(w => w.word.replace(/[^a-zA-Z]/g, ''))
       .filter(Boolean)
 
-    const feedback = buildFeedback(
-      scoreAccuracy, scoreWpm, wpmTarget, scorePhrasing,
-      countOmissions, countSubstitutions, difficultWords,
-    )
+    // Generate feedback
+    let feedback = ''
+    if (aiFeedbackEnabled) {
+      feedback = await buildAiFeedback(
+        grade ?? 10,
+        scoreAccuracy, scoreWpm, wpmTarget, scorePhrasing,
+        countOmissions, countSubstitutions, difficultWords,
+      )
+    }
+    // Fall back to rule-based if AI is off or GPT call failed
+    if (!feedback) {
+      feedback = buildRuleFeedback(
+        scoreAccuracy, scoreWpm, wpmTarget, scorePhrasing,
+        countOmissions, countSubstitutions, difficultWords,
+      )
+    }
 
-    // Save session
     const { data: session, error: dbError } = await supabase
       .from('sessions')
       .insert({
@@ -229,7 +274,7 @@ Deno.serve(async (req) => {
         transcript,
         score_accuracy: scoreAccuracy,
         score_wpm: scoreWpm,
-        score_fluency: scorePhrasing,   // kept for backward compat, same as phrasing
+        score_fluency: scorePhrasing,
         score_phrasing: scorePhrasing,
         count_omissions: countOmissions,
         count_substitutions: countSubstitutions,
@@ -244,7 +289,6 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: dbError.message }), { status: 500, headers: corsHeaders })
     }
 
-    // Delete audio after processing
     await supabase.storage.from('audio').remove([audioPath])
 
     return new Response(JSON.stringify({ sessionId: session.id }), {

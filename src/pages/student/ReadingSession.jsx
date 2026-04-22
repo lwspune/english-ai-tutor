@@ -9,13 +9,21 @@ export default function ReadingSession() {
   const { profile } = useAuth()
   const navigate = useNavigate()
   const [passage, setPassage] = useState(null)
+  const [aiFeedbackEnabled, setAiFeedbackEnabled] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const { recording, audioBlob, startRecording, stopRecording, reset } = useAudioRecorder()
 
   useEffect(() => {
-    supabase.from('passages').select('*').eq('id', passageId).single()
-      .then(({ data }) => setPassage(data))
+    async function load() {
+      const [{ data: p }, { data: s }] = await Promise.all([
+        supabase.from('passages').select('*').eq('id', passageId).single(),
+        supabase.from('app_settings').select('ai_feedback_enabled').single(),
+      ])
+      setPassage(p)
+      setAiFeedbackEnabled(s?.ai_feedback_enabled ?? true)
+    }
+    load()
   }, [passageId])
 
   async function handleSubmit() {
@@ -33,7 +41,7 @@ export default function ReadingSession() {
       const { data: { publicUrl } } = supabase.storage.from('audio').getPublicUrl(filename)
 
       const { data, error: fnError } = await supabase.functions.invoke('analyze-reading', {
-        body: { audioPath: filename, passageText: passage.content, studentId: profile.id, passageId, grade: profile.grade },
+        body: { audioPath: filename, passageText: passage.content, studentId: profile.id, passageId, grade: profile.grade, aiFeedbackEnabled },
       })
       if (fnError) throw fnError
 

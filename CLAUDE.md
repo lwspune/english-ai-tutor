@@ -63,10 +63,22 @@ English reading-aloud evaluation app for high school students (grades 9–12) wi
 ```
 `SessionReport` detects JSON vs plain text and renders accordingly — old sessions with plain-text feedback still display correctly.
 
+### Comprehension quiz flow
+After a reading session, if the passage has questions attached:
+1. `SessionReport` shows an "Answer Comprehension Questions" button (only when not yet answered)
+2. Student navigates to `/student/comprehension/:sessionId` — `ComprehensionQuiz` page
+3. All questions shown at once (3–5 per passage); submit button disabled until all answered
+4. Answers graded client-side via `gradeAnswers()` in `src/lib/comprehension.js`
+5. Session updated with `score_comprehension` (0–100) and `comprehension_answers` (jsonb)
+6. Student redirected back to report — comprehension score ring + per-question results shown
+- Quiz is **once-only per session** — revisiting the route redirects back to report
+- `ComprehensionQuiz` also redirects silently if the passage has no questions
+
 ### Teacher dashboard
 - **AI Feedback toggle** — global on/off button in the header, persisted in `app_settings` table
-- **Student detail** — progress table (oldest → newest) with ↑/↓ trend arrows per session
+- **Student detail** — progress table (oldest → newest) with ↑/↓ trend arrows per session; includes Comp. column
 - **Recurring difficult words** — words mispronounced/skipped in 2+ sessions, shown as chips
+- **Question Manager** — inline panel per passage in `PassageManager`; add/delete MCQs (3–5 per passage, DB-enforced by trigger)
 
 ### Auth & routing
 - `AuthContext` holds both the Supabase `user` and app `profile` (from `profiles` table). Always use `profile` for role/grade — never `user.user_metadata` in components.
@@ -76,7 +88,8 @@ English reading-aloud evaluation app for high school students (grades 9–12) wi
 ### Database schema (key points)
 - `profiles` — `role` is `teacher` or `student`; `grade` 9–12 (null for teachers)
 - `passages` — `word_count` computed client-side on insert in `PassageManager`
-- `sessions` — `word_results` JSONB `[{ word, spoken, status }]`, status ∈ `correct | substitution | omission`; also stores `score_accuracy`, `score_wpm`, `score_phrasing`, `score_fluency` (same as phrasing, kept for compat), `count_omissions`, `count_substitutions`, `feedback` (JSON string or plain text)
+- `sessions` — `word_results` JSONB `[{ word, spoken, status }]`, status ∈ `correct | substitution | omission`; also stores `score_accuracy`, `score_wpm`, `score_phrasing`, `score_fluency` (same as phrasing, kept for compat), `count_omissions`, `count_substitutions`, `feedback` (JSON string or plain text), `score_comprehension` (int nullable), `comprehension_answers` (jsonb nullable — `[{ question_id, selected_index, is_correct }]`)
+- `questions` — `passage_id` FK, `question_text`, `options` (jsonb array of 4 strings), `correct_index` (0–3), `display_order`; max 5 per passage enforced by DB trigger `enforce_question_limit`
 - `app_settings` — single-row table (`id boolean PK default true`), holds `ai_feedback_enabled boolean`
 - RLS on all tables. `is_teacher()` security definer function used in profiles policy to avoid infinite recursion.
 

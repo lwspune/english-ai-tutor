@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { computeAvgComprehension } from '../../lib/studentStats'
 
 const WPM_TARGETS = { 9: 140, 10: 150, 11: 160, 12: 170 }
 
@@ -91,6 +92,8 @@ export default function StudentDetail() {
     ? Math.round(sessions.reduce((a, s) => a + (s.score_phrasing ?? s.score_fluency ?? 0), 0) / sessions.length)
     : null
 
+  const avgComprehension = computeAvgComprehension(sessions)
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
@@ -118,6 +121,7 @@ export default function StudentDetail() {
             },
             { label: 'Avg Pace', value: avgWpm != null ? `${avgWpm} wpm` : '—' },
             { label: 'Avg Phrasing', value: avgPhrasing != null ? `${avgPhrasing}%` : '—' },
+            { label: 'Avg Comprehension', value: avgComprehension != null ? `${avgComprehension}%` : '—' },
           ].map(stat => (
             <div key={stat.label} className="bg-white rounded-2xl border border-gray-200 p-4 text-center">
               <p className="text-2xl font-bold text-gray-800">{stat.value}</p>
@@ -166,6 +170,7 @@ export default function StudentDetail() {
                     <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Phrasing</th>
                     <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Skipped</th>
                     <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Subs</th>
+                    <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Comp.</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -212,6 +217,16 @@ export default function StudentDetail() {
                         <td className="px-3 py-3 text-center text-amber-500 font-semibold">
                           {s.count_substitutions ?? '—'}
                         </td>
+                        {s.score_comprehension != null ? (
+                          <TrendCell
+                            value={s.score_comprehension}
+                            display={`${s.score_comprehension}%`}
+                            prev={prev?.score_comprehension ?? null}
+                            goodDirection="up"
+                          />
+                        ) : (
+                          <td className="px-3 py-3 text-center text-gray-300 text-xs">—</td>
+                        )}
                       </tr>
                     )
                   })}

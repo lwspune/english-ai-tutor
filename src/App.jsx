@@ -5,6 +5,7 @@ import LoginPage from './pages/LoginPage'
 import StudentHome from './pages/student/StudentHome'
 import ReadingSession from './pages/student/ReadingSession'
 import SessionReport from './pages/student/SessionReport'
+import ComprehensionQuiz from './pages/student/ComprehensionQuiz'
 import TeacherDashboard from './pages/teacher/TeacherDashboard'
 import PassageManager from './pages/teacher/PassageManager'
 import StudentDetail from './pages/teacher/StudentDetail'
@@ -28,6 +29,7 @@ export default function App() {
           <Route path="/student" element={<ProtectedRoute role="student"><StudentHome /></ProtectedRoute>} />
           <Route path="/student/session/:passageId" element={<ProtectedRoute role="student"><ReadingSession /></ProtectedRoute>} />
           <Route path="/student/report/:sessionId" element={<ProtectedRoute role="student"><SessionReport /></ProtectedRoute>} />
+          <Route path="/student/comprehension/:sessionId" element={<ProtectedRoute role="student"><ComprehensionQuiz /></ProtectedRoute>} />
 
           <Route path="/teacher" element={<ProtectedRoute role="teacher"><TeacherDashboard /></ProtectedRoute>} />
           <Route path="/teacher/passages" element={<ProtectedRoute role="teacher"><PassageManager /></ProtectedRoute>} />

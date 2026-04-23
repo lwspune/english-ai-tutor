@@ -2,6 +2,44 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 
+function ComprehensionResults({ questions, answers }) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-4">
+      <h3 className="text-sm font-semibold text-gray-700">Comprehension Results</h3>
+      {questions
+        .slice()
+        .sort((a, b) => a.display_order - b.display_order)
+        .map((q, qi) => {
+          const ans = answers.find(a => a.question_id === q.id)
+          return (
+            <div key={q.id}>
+              <p className="text-sm font-medium text-gray-800 mb-2">
+                <span className="text-gray-400 mr-1">{qi + 1}.</span>
+                <span>{q.question_text}</span>
+              </p>
+              <div className="space-y-1">
+                {q.options.map((opt, oi) => {
+                  const isCorrect = oi === q.correct_index
+                  const isSelected = ans?.selected_index === oi
+                  let cls = 'text-gray-500'
+                  if (isSelected && isCorrect) cls = 'text-green-700 font-semibold'
+                  else if (isSelected && !isCorrect) cls = 'text-red-600 font-semibold'
+                  else if (isCorrect) cls = 'text-green-600'
+                  return (
+                    <p key={oi} className={`text-xs flex items-center gap-1 ${cls}`}>
+                      <span>{isSelected ? (isCorrect ? '✓' : '✗') : isCorrect ? '✓' : ' '}</span>
+                      <span>{opt}</span>
+                    </p>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
+    </div>
+  )
+}
+
 const WPM_TARGETS = { 9: 140, 10: 150, 11: 160, 12: 170 }
 
 function FeedbackCard({ raw }) {
@@ -64,6 +102,7 @@ export default function SessionReport() {
   const navigate = useNavigate()
   const [session, setSession] = useState(null)
   const [grade, setGrade] = useState(null)
+  const [questions, setQuestions] = useState([])
 
   useEffect(() => {
     async function load() {
@@ -74,12 +113,12 @@ export default function SessionReport() {
         .single()
       setSession(s)
 
-      const { data: p } = await supabase
-        .from('profiles')
-        .select('grade')
-        .eq('id', s?.student_id)
-        .single()
+      const [{ data: p }, { data: qs }] = await Promise.all([
+        supabase.from('profiles').select('grade').eq('id', s?.student_id).single(),
+        supabase.from('questions').select('*').eq('passage_id', s?.passage_id).order('display_order'),
+      ])
       setGrade(p?.grade ?? null)
+      setQuestions(qs ?? [])
     }
     load()
   }, [sessionId])
@@ -117,7 +156,7 @@ export default function SessionReport() {
           <p className="text-xs text-gray-400 mb-1">{new Date(session.created_at).toLocaleString()}</p>
           <h2 className="text-base font-semibold text-gray-800 mb-5">{session.passages.title}</h2>
 
-          <div className="flex justify-around">
+          <div className="flex justify-around flex-wrap gap-4">
             <ScoreRing
               value={`${session.score_accuracy}%`}
               label="Accuracy"
@@ -134,6 +173,13 @@ export default function SessionReport() {
               label="Phrasing"
               color="border-purple-500"
             />
+            {session.score_comprehension != null && (
+              <ScoreRing
+                value={`${session.score_comprehension}%`}
+                label="Comprehension"
+                color="border-teal-500"
+              />
+            )}
           </div>
 
           {/* Error summary */}
@@ -180,6 +226,26 @@ export default function SessionReport() {
 
         {/* Feedback */}
         {session.feedback && <FeedbackCard raw={session.feedback} />}
+
+        {/* Comprehension */}
+        {questions.length > 0 && session.comprehension_answers == null && (
+          <div className="bg-white rounded-2xl border border-gray-200 p-5 flex flex-col items-center gap-3 text-center">
+            <p className="text-sm text-gray-600">Ready to test your understanding?</p>
+            <button
+              onClick={() => navigate(`/student/comprehension/${sessionId}`)}
+              className="bg-teal-600 text-white px-6 py-3 rounded-xl text-sm font-semibold hover:bg-teal-700 transition-colors min-h-[44px] w-full sm:w-auto"
+            >
+              Answer Comprehension Questions
+            </button>
+          </div>
+        )}
+
+        {questions.length > 0 && session.comprehension_answers != null && (
+          <ComprehensionResults
+            questions={questions}
+            answers={session.comprehension_answers}
+          />
+        )}
       </main>
     </div>
   )

@@ -10,6 +10,14 @@ export default function TeacherDashboard() {
   const [loading, setLoading] = useState(true)
   const [aiFeedback, setAiFeedback] = useState(true)
   const [togglingAi, setTogglingAi] = useState(false)
+  const [classCode, setClassCode] = useState('')
+  const [codeCopied, setCodeCopied] = useState(false)
+
+  function copyCode() {
+    navigator.clipboard.writeText(classCode)
+    setCodeCopied(true)
+    setTimeout(() => setCodeCopied(false), 2000)
+  }
 
   async function toggleAiFeedback() {
     setTogglingAi(true)
@@ -23,8 +31,13 @@ export default function TeacherDashboard() {
   }
 
   useEffect(() => {
-    supabase.from('app_settings').select('ai_feedback_enabled').single()
-      .then(({ data }) => { if (data) setAiFeedback(data.ai_feedback_enabled) })
+    supabase.from('app_settings').select('ai_feedback_enabled, class_code').single()
+      .then(({ data }) => {
+        if (data) {
+          setAiFeedback(data.ai_feedback_enabled)
+          setClassCode(data.class_code ?? '')
+        }
+      })
   }, [])
 
   useEffect(() => {
@@ -72,6 +85,17 @@ export default function TeacherDashboard() {
         <div className="flex items-center gap-3 flex-wrap justify-end">
           <button onClick={() => navigate('/teacher/passages')} className="text-sm text-blue-600 hover:text-blue-800 font-medium">Manage Passages</button>
           <button onClick={() => navigate('/teacher/completion')} className="text-sm text-blue-600 hover:text-blue-800 font-medium">Passage Completion</button>
+          {classCode && (
+            <button
+              onClick={copyCode}
+              className="flex items-center gap-1.5 text-xs font-mono bg-gray-100 hover:bg-gray-200 text-gray-700 px-2.5 py-1.5 rounded-lg transition-colors"
+              aria-label="Copy class code"
+            >
+              <span className="text-gray-400 font-sans">Code:</span>
+              <span className="font-semibold tracking-widest">{classCode}</span>
+              <span className="text-gray-400">{codeCopied ? '✓' : '⎘'}</span>
+            </button>
+          )}
           <button
             onClick={toggleAiFeedback}
             disabled={togglingAi}

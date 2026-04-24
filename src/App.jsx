@@ -10,6 +10,7 @@ import StudentProgress from './pages/student/StudentProgress'
 import TeacherDashboard from './pages/teacher/TeacherDashboard'
 import PassageManager from './pages/teacher/PassageManager'
 import StudentDetail from './pages/teacher/StudentDetail'
+import PassageCompletion from './pages/teacher/PassageCompletion'
 
 function RootRedirect() {
   const { profile, loading } = useAuth()
@@ -36,6 +37,7 @@ export default function App() {
           <Route path="/teacher" element={<ProtectedRoute role="teacher"><TeacherDashboard /></ProtectedRoute>} />
           <Route path="/teacher/passages" element={<ProtectedRoute role="teacher"><PassageManager /></ProtectedRoute>} />
           <Route path="/teacher/student/:studentId" element={<ProtectedRoute role="teacher"><StudentDetail /></ProtectedRoute>} />
+          <Route path="/teacher/completion" element={<ProtectedRoute role="teacher"><PassageCompletion /></ProtectedRoute>} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

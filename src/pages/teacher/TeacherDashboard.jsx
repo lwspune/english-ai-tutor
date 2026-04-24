@@ -71,6 +71,7 @@ export default function TeacherDashboard() {
         <h1 className="text-lg font-semibold text-gray-800">Teacher Dashboard</h1>
         <div className="flex items-center gap-3 flex-wrap justify-end">
           <button onClick={() => navigate('/teacher/passages')} className="text-sm text-blue-600 hover:text-blue-800 font-medium">Manage Passages</button>
+          <button onClick={() => navigate('/teacher/completion')} className="text-sm text-blue-600 hover:text-blue-800 font-medium">Passage Completion</button>
           <button
             onClick={toggleAiFeedback}
             disabled={togglingAi}

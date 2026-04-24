@@ -7,11 +7,36 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### UI
 - All student-facing screens must be mobile-first. Use Tailwind responsive prefixes (`sm:`, `md:`) and test layouts at 375px width. Touch targets must be at least 44px. Avoid horizontal scroll.
 
-### Testing
-- Follow test-first (TDD): write or update tests before writing implementation code. Do not write implementation until the test exists and fails for the right reason.
+### Backend Integrity
+- Enforce data rules at the DB level (FK, CHECK constraints, NOT NULL, triggers), not just in app code. Validate and reject bad input at the edge function boundary before any external API call (fail fast). Use transactions for multi-step writes. Return a consistent shape: `{ data }` on success, `{ error }` on failure. Keep all scoring and business logic server-side — never in client JS.
+- **Known violation:** `gradeAnswers()` in `src/lib/comprehension.js` runs client-side — a student can manipulate scores before they're saved. Should move to an edge function or DB RPC.
 
-### Planning
-- For any new feature or non-trivial edit, always analyze and present a plan first. Get confirmation before writing any code.
+### No over-engineering
+- Don't over-engineer or over-complicate. Prefer the simplest solution that satisfies the requirement. Avoid premature abstractions, unnecessary layers, and speculative generality.
+
+### Comments
+- Default to no comments. Only add one when the WHY is non-obvious and cannot be expressed through naming or structure (e.g. a hidden constraint, a workaround for a specific bug, a deliberate trade-off). Never explain what the code does — well-named identifiers do that. Never leave commented-out dead code.
+
+### Accessibility
+- Use Tailwind `focus-visible:` utilities for focus styles on all interactive elements.
+
+### Definition of Done
+- Golden path must be verified in the browser at 375px width specifically.
+
+### Security
+- Validate and sanitize all user input at system boundaries. Avoid XSS — never use `dangerouslySetInnerHTML` with user-supplied content. Keep RLS enabled on all Supabase tables.
+
+### Dependency Management
+- Existing stack is React, Tailwind, and Supabase — exhaust these before adding a new package.
+
+### Test Scope
+- For edge functions, prefer integration tests over mocks.
+
+### Function Size / Cohesion
+- Each function or component should do one thing. If you need "and" to describe what it does, split it. Prefer small, named functions over large inline logic blocks.
+
+### Performance
+- Avoid N+1 queries — batch Supabase calls where possible. Avoid unnecessary React re-renders. Keep the bundle lean by code-splitting routes. Don't optimise prematurely — only when there is a measured problem.
 
 ## Commands
 

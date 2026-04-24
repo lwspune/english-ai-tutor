@@ -84,6 +84,7 @@ After a reading session, if the passage has questions attached:
 - `AuthContext` holds both the Supabase `user` and app `profile` (from `profiles` table). Always use `profile` for role/grade — never `user.user_metadata` in components.
 - `ProtectedRoute` accepts optional `role` prop (`"teacher"` | `"student"`). Root `/` redirects based on `profile.role`.
 - The `handle_new_user` DB trigger auto-creates a `profiles` row on signup using `raw_user_meta_data`. When creating users manually via the Supabase dashboard, insert profiles via SQL instead (the dashboard doesn't set metadata at creation time).
+- `onAuthStateChange` intentionally ignores `TOKEN_REFRESHED` and `INITIAL_SESSION` events — acting on them sets `loading=true` and causes a full page remount when the user switches back to the tab.
 
 ### Database schema (key points)
 - `profiles` — `role` is `teacher` or `student`; `grade` 9–12 (null for teachers)
@@ -92,6 +93,15 @@ After a reading session, if the passage has questions attached:
 - `questions` — `passage_id` FK, `question_text`, `options` (jsonb array of 4 strings), `correct_index` (0–3), `display_order`; max 5 per passage enforced by DB trigger `enforce_question_limit`
 - `app_settings` — single-row table (`id boolean PK default true`), holds `ai_feedback_enabled boolean`
 - RLS on all tables. `is_teacher()` security definer function used in profiles policy to avoid infinite recursion.
+
+### Edge function error handling
+`src/lib/edgeFunctionError.js` — `extractEdgeFunctionError(fnError)` reads the JSON body from `fnError.context.json()` and returns `body.error` if present, falling back to `fnError.message`. Use this instead of `data?.error || fnError.message` because `data` is always `null` for non-2xx responses from `supabase.functions.invoke`.
+
+### Bulk user creation via SQL
+To create many users at once (e.g. a class list), insert directly into `auth.users` + `auth.identities`. The `handle_new_user` trigger fires on the insert and creates the `profiles` row automatically if `raw_user_meta_data` contains `full_name`, `role`, and `grade`.
+- Use `WHERE NOT EXISTS` instead of `ON CONFLICT (email)` — the email uniqueness index is a partial index (`WHERE is_sso_user = false`) and cannot be referenced by name in `ON CONFLICT`.
+- Password: `crypt(plain_password, gen_salt('bf'))`
+- Identity row needs: `provider = 'email'`, `provider_id = email`, `identity_data = {"sub": user_id, "email": email}`
 
 ### Known production quirks
 - **Edge function must be deployed with `--no-verify-jwt`** — Supabase's new `sb_publishable_...` key format is not a JWT, so the runtime rejects requests otherwise.

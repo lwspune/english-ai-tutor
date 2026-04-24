@@ -2,6 +2,31 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Learning Principles
+
+Every feature must serve at least one of these principles. If it doesn't, question whether it belongs.
+
+### Retrieval Practice
+Test recall, don't just re-expose. Comprehension quizzes, vocabulary exercises, and any "check yourself" mechanic are higher value than re-reading. Never build a feature that only shows information passively.
+
+### Spaced Repetition
+Material the student struggled with must resurface. Mastery threshold is 80% accuracy. A student who passes 80% has earned the right to move on; below that, keep the item in rotation. Never permanently hide content the student hasn't mastered.
+
+### Immediate Feedback
+Feedback is most effective when it arrives right after the attempt, before the student moves on. Any scored activity must show results on the same screen or the next immediate one — never deferred to a dashboard the student has to go find.
+
+### Deliberate Practice
+Surface the specific thing the student got wrong and make them practice that exact thing. Generic "keep practising" is weak. "You skipped 'therefore' in 4 sessions — here it is in a sentence, read it aloud" is strong. Build toward the latter.
+
+### Mastery Before Progression
+Don't let students accumulate attempts and move on with a 40% score. Gate progression on demonstrated mastery (80%). If all attempts are exhausted below threshold, that's a signal for the teacher, not a silent pass.
+
+### Metacognition
+Students learn better when they can see their own trajectory. Every metric we track (accuracy, WPM, phrasing, comprehension) must be visible to the student in plain language, not just the teacher. Progress charts, trend arrows, and session comparisons all serve this.
+
+### Growth-Framed Feedback
+Feedback must name what went well and what to work on next — never just a score. The GPT feedback fields (`wentWell`, `focusOn`, `tip`) encode this. Any new feedback surface must follow the same pattern.
+
 ## Development Preferences
 
 ### UI

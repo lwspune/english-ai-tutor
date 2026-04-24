@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/AuthContext'
+import { classifyPassages } from '../../lib/passageClassifier'
 
 export default function StudentHome() {
   const { profile, signOut } = useAuth()
   const navigate = useNavigate()
-  const [passages, setPassages] = useState([])
+  const [todo, setTodo] = useState([])
+  const [retry, setRetry] = useState([])
   const [sessions, setSessions] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -17,8 +19,9 @@ export default function StudentHome() {
         supabase.from('sessions').select('*, passages(title)').eq('student_id', profile.id).order('created_at', { ascending: false }),
       ])
       const allSessions = s ?? []
-      const readPassageIds = new Set(allSessions.map(s => s.passage_id))
-      setPassages((p ?? []).filter(p => !readPassageIds.has(p.id)))
+      const { todo, retry } = classifyPassages(p ?? [], allSessions)
+      setTodo(todo)
+      setRetry(retry)
       setSessions(allSessions.slice(0, 10))
       setLoading(false)
     }
@@ -52,11 +55,11 @@ export default function StudentHome() {
           <h2 className="text-base font-semibold text-gray-700 mb-3">Assigned Passages</h2>
           {loading ? (
             <p className="text-sm text-gray-400">Loading...</p>
-          ) : passages.length === 0 ? (
+          ) : todo.length === 0 && retry.length === 0 ? (
             <p className="text-sm text-gray-400">No passages assigned yet.</p>
           ) : (
             <div className="space-y-2">
-              {passages.map(p => (
+              {todo.map(p => (
                 <div key={p.id} className="bg-white rounded-xl border border-gray-200 px-4 py-3 flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-800">{p.title}</p>
@@ -64,7 +67,7 @@ export default function StudentHome() {
                   </div>
                   <button
                     onClick={() => navigate(`/student/session/${p.id}`)}
-                    className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors"
+                    className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                   >
                     Start Reading
                   </button>
@@ -73,6 +76,32 @@ export default function StudentHome() {
             </div>
           )}
         </section>
+
+        {retry.length > 0 && (
+          <section>
+            <h2 className="text-base font-semibold text-gray-700 mb-1">Keep Practising</h2>
+            <p className="text-xs text-gray-400 mb-3">You haven't mastered these yet. Give them another go.</p>
+            <div className="space-y-2">
+              {retry.map(p => (
+                <div key={p.id} className="bg-amber-50 rounded-xl border border-amber-200 px-4 py-3 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">{p.title}</p>
+                    <p className="text-xs text-gray-500">
+                      Best score: <span className="font-semibold text-amber-700">{p.bestScore}%</span>
+                      {' · '}{3 - p.attemptsUsed} attempt{3 - p.attemptsUsed !== 1 ? 's' : ''} left
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => navigate(`/student/session/${p.id}`)}
+                    className="bg-amber-500 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-amber-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         <section>
           <h2 className="text-base font-semibold text-gray-700 mb-3">Recent Sessions</h2>

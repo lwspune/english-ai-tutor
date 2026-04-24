@@ -81,6 +81,8 @@ English reading-aloud evaluation app for high school students (grades 9–12) wi
 - **Omissions** — passage words skipped entirely
 - **Substitutions** — wrong word said in place of a passage word
 
+WPM targets live in `src/lib/wpmTargets.js` — import from there, never hardcode.
+
 ### AI Feedback structure (GPT-4o-mini, stored as JSON in `feedback` column)
 ```json
 { "wentWell": "...", "focusOn": "...", "practiseWords": ["word1"], "tip": "..." }
@@ -93,21 +95,37 @@ After a reading session, if the passage has questions attached:
 2. Student navigates to `/student/comprehension/:sessionId` — `ComprehensionQuiz` page
 3. Passage text shown in a scrollable card (max-h-48) above the questions so the student can refer back
 4. All questions shown at once (3–5 per passage); submit button disabled until all answered
-5. Answers graded server-side via `grade_comprehension` RPC — `correct_index` is never sent to the client
-6. Session updated with `score_comprehension` (0–100) and `comprehension_answers` (jsonb)
-7. Student redirected back to report — comprehension score ring + per-question results shown
+5. Tapping Submit shows a confirmation modal ("cannot be changed") before calling the RPC
+6. Answers graded server-side via `grade_comprehension` RPC — `correct_index` is never sent to the client
+7. Session updated with `score_comprehension` (0–100) and `comprehension_answers` (jsonb)
+8. Student redirected back to report — comprehension score ring + per-question results shown
 - Quiz is **once-only per session** — revisiting the route redirects back to report
 - `ComprehensionQuiz` also redirects silently if the passage has no questions
+- Teacher can reset a student's comprehension attempt via the `reset_comprehension` RPC (button in StudentDetail Comp. column)
+
+### Student pages
+- `StudentHome` (`/student`) — lists unread passages (read ones are hidden) + last 10 sessions; "My Progress" banner navigates to `/student/progress`
+- `ReadingSession` (`/student/session/:passageId`) — audio recording
+- `SessionReport` (`/student/report/:sessionId`) — word-by-word results + feedback + comprehension CTA
+- `ComprehensionQuiz` (`/student/comprehension/:sessionId`) — once-only quiz with confirmation modal
+- `StudentProgress` (`/student/progress`) — sparkline trend charts for Accuracy, Pace, Phrasing, Comprehension
 
 ### Teacher dashboard
 - **AI Feedback toggle** — global on/off button in the header, persisted in `app_settings` table
-- **Student detail** — progress table (oldest → newest) with ↑/↓ trend arrows per session; includes Comp. column
-- **Recurring difficult words** — words mispronounced/skipped in 2+ sessions, shown as chips
+- **Class code display** — shown in header with one-tap copy; students use this code to self-register
+- **Passage Completion** (`/teacher/completion`) — per-passage cards showing count completed + chips for students who haven't read yet; chips link to student detail
+- **Student detail** (`/teacher/student/:id`) — summary stats, sparkline performance trends (Accuracy, Pace, Phrasing, Comprehension), recurring difficult words, session progress table with ↑/↓ trend arrows and comprehension Reset button
 - **Question Manager** — inline panel per passage in `PassageManager`; add/delete MCQs (3–5 per passage, DB-enforced by trigger)
+
+### Shared components
+- `src/components/PerformanceCharts.jsx` — exports `MetricCard` (sparkline card with Latest/Best/Change stats); used in both `StudentProgress` and `StudentDetail`
+- `src/lib/wpmTargets.js` — exports `WPM_TARGETS` constant `{ 9: 140, 10: 150, 11: 160, 12: 170 }`
+- `src/lib/studentStats.js` — exports `computeAvgComprehension(sessions)`
 
 ### Auth & routing
 - `AuthContext` holds both the Supabase `user` and app `profile` (from `profiles` table). Always use `profile` for role/grade — never `user.user_metadata` in components.
 - `ProtectedRoute` accepts optional `role` prop (`"teacher"` | `"student"`). Root `/` redirects based on `profile.role`.
+- **Student self-registration:** `LoginPage` has Sign In / Sign Up tabs. Sign Up validates a class code via `validate_class_code` RPC (callable by anon), then calls `supabase.auth.signUp()` with `raw_user_meta_data: { full_name, role: 'student', grade }`. The `handle_new_user` trigger auto-creates the profile. Teachers cannot self-register.
 - The `handle_new_user` DB trigger auto-creates a `profiles` row on signup using `raw_user_meta_data`. When creating users manually via the Supabase dashboard, insert profiles via SQL instead (the dashboard doesn't set metadata at creation time).
 - `onAuthStateChange` intentionally ignores `TOKEN_REFRESHED` and `INITIAL_SESSION` events — acting on them sets `loading=true` and causes a full page remount when the user switches back to the tab.
 
@@ -116,23 +134,24 @@ After a reading session, if the passage has questions attached:
 - `passages` — `word_count` computed client-side on insert in `PassageManager`
 - `sessions` — `word_results` JSONB `[{ word, spoken, status }]`, status ∈ `correct | substitution | omission`; also stores `score_accuracy`, `score_wpm`, `score_phrasing`, `score_fluency` (same as phrasing, kept for compat), `count_omissions`, `count_substitutions`, `feedback` (JSON string or plain text), `score_comprehension` (int nullable), `comprehension_answers` (jsonb nullable — `[{ question_id, selected_index, is_correct }]`)
 - `questions` — `passage_id` FK, `question_text`, `options` (jsonb array of 4 strings), `correct_index` (0–3), `display_order`; max 5 per passage enforced by DB trigger `enforce_question_limit`
-- `app_settings` — single-row table (`id boolean PK default true`), holds `ai_feedback_enabled boolean`
+- `app_settings` — single-row table (`id boolean PK default true`), holds `ai_feedback_enabled boolean`, `class_code text` (random 6-char code set on migration; teacher shares with students for self-registration)
 - RLS on all tables. `is_teacher()` security definer function used in profiles policy to avoid infinite recursion.
+
+### RPCs
+- `grade_comprehension(p_session_id, p_answers)` — server-side comprehension grading; validates session ownership, prevents re-grading, saves score atomically
+- `reset_comprehension(p_session_id)` — teacher-only; clears `score_comprehension` and `comprehension_answers` for a session
+- `validate_class_code(p_code)` — callable by anon; returns boolean; used during student signup
 
 ### Edge function error handling
 `src/lib/edgeFunctionError.js` — `extractEdgeFunctionError(fnError)` reads the JSON body from `fnError.context.json()` and returns `body.error` if present, falling back to `fnError.message`. Use this instead of `data?.error || fnError.message` because `data` is always `null` for non-2xx responses from `supabase.functions.invoke`.
 
-### Bulk user creation via SQL
-To create many users at once (e.g. a class list), insert directly into `auth.users` + `auth.identities`. The `handle_new_user` trigger fires on the insert and creates the `profiles` row automatically if `raw_user_meta_data` contains `full_name`, `role`, and `grade`.
-- Use `WHERE NOT EXISTS` instead of `ON CONFLICT (email)` — the email uniqueness index is a partial index (`WHERE is_sso_user = false`) and cannot be referenced by name in `ON CONFLICT`.
-- Password: `crypt(plain_password, gen_salt('bf'))`
-- Identity row needs: `provider = 'email'`, `provider_id = email`, `identity_data = {"sub": user_id, "email": email}`
-
 ### Known production quirks
 - **Edge function must be deployed with `--no-verify-jwt`** — Supabase's new `sb_publishable_...` key format is not a JWT, so the runtime rejects requests otherwise.
 - **On Windows, `KEY=value command` syntax doesn't work** — use `set KEY=value` then the command on a separate line.
-- **Creating users manually:** Supabase Auth dashboard doesn't set `raw_user_meta_data` at creation time, so the trigger inserts with default role `student`. Always follow up with a manual SQL insert into `profiles` for the correct role/name.
+- **Creating teacher accounts manually:** Supabase Auth dashboard doesn't set `raw_user_meta_data` at creation time, so the trigger inserts with default role `student`. Always follow up with a manual SQL insert into `profiles` for the correct role/name.
+- **Email confirmation:** If Supabase Auth email confirmation is enabled, students see a "check your email" screen after signup. For school use, consider disabling it (Auth → Settings → disable email confirmations).
 - **Storage RLS:** `storage.objects` has a policy `students can upload audio` allowing authenticated users to upload to their own folder (`{uid}/...`). Service role in the edge function bypasses this for downloads.
+- **Class code:** Set once by migration (random 6-char hex). To change it: `update app_settings set class_code = 'NEWCODE' where id = true;`
 
 ### Environment variables
 Frontend (`.env.local`):
@@ -143,10 +162,10 @@ Edge function secrets (Supabase dashboard → Edge Functions → Secrets):
 - `OPENAI_API_KEY` — used for both Whisper and GPT-4o-mini
 - `SUPABASE_SERVICE_ROLE_KEY` (auto-injected by Supabase runtime)
 
-### Adding new users (manual process)
+### Adding teacher accounts (manual process)
 ```sql
 -- After creating user in Auth dashboard (email + password only):
 insert into profiles (id, full_name, role, grade)
-select id, 'Full Name', 'student', 10   -- or 'teacher', null
-from auth.users where email = 'user@example.com';
+select id, 'Full Name', 'teacher', null
+from auth.users where email = 'teacher@school.com';
 ```

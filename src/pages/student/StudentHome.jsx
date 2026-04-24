@@ -14,10 +14,12 @@ export default function StudentHome() {
     async function load() {
       const [{ data: p }, { data: s }] = await Promise.all([
         supabase.from('passages').select('*').order('created_at', { ascending: false }),
-        supabase.from('sessions').select('*, passages(title)').eq('student_id', profile.id).order('created_at', { ascending: false }).limit(10),
+        supabase.from('sessions').select('*, passages(title)').eq('student_id', profile.id).order('created_at', { ascending: false }),
       ])
-      setPassages(p ?? [])
-      setSessions(s ?? [])
+      const allSessions = s ?? []
+      const readPassageIds = new Set(allSessions.map(s => s.passage_id))
+      setPassages((p ?? []).filter(p => !readPassageIds.has(p.id)))
+      setSessions(allSessions.slice(0, 10))
       setLoading(false)
     }
     load()
@@ -34,6 +36,18 @@ export default function StudentHome() {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+        <button
+          onClick={() => navigate('/student/progress')}
+          className="w-full bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center justify-between text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          aria-label="View my progress"
+        >
+          <div>
+            <p className="text-sm font-semibold text-blue-700">My Progress</p>
+            <p className="text-xs text-blue-400 mt-0.5">View your reading trends over time</p>
+          </div>
+          <span className="text-blue-400 text-lg" aria-hidden="true">→</span>
+        </button>
+
         <section>
           <h2 className="text-base font-semibold text-gray-700 mb-3">Assigned Passages</h2>
           {loading ? (

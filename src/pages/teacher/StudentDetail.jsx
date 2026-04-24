@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { computeAvgComprehension } from '../../lib/studentStats'
-
-const WPM_TARGETS = { 9: 140, 10: 150, 11: 160, 12: 170 }
+import { MetricCard } from '../../components/PerformanceCharts'
+import { WPM_TARGETS } from '../../lib/wpmTargets'
 
 function trend(current, previous) {
   if (previous == null) return null
@@ -132,6 +132,40 @@ export default function StudentDetail() {
             </div>
           ))}
         </div>
+
+        {/* Performance trends */}
+        {sessions.length > 0 && (() => {
+          const accuracy = sessions.map(s => s.score_accuracy)
+          const wpm = sessions.map(s => s.score_wpm)
+          const phrasing = sessions.map(s => s.score_phrasing ?? s.score_fluency ?? 0)
+          const comprehension = sessions
+            .filter(s => s.score_comprehension != null)
+            .map(s => s.score_comprehension)
+          const wpmMax = Math.ceil(Math.max(wpmTarget * 1.2, ...wpm) / 10) * 10
+          return (
+            <div>
+              <h2 className="text-base font-semibold text-gray-700 mb-3">Performance Trends</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <MetricCard label="Accuracy" values={accuracy} color="#3b82f6" fillColor="#dbeafe" unit="%" />
+                <MetricCard
+                  label="Pace"
+                  values={wpm}
+                  color="#10b981"
+                  fillColor="#d1fae5"
+                  unit=" wpm"
+                  referenceY={wpmTarget}
+                  yMin={0}
+                  yMax={wpmMax}
+                  refLabel={`Dashed line — target: ${wpmTarget} wpm`}
+                />
+                <MetricCard label="Phrasing" values={phrasing} color="#8b5cf6" fillColor="#ede9fe" unit="%" />
+                {comprehension.length > 0 && (
+                  <MetricCard label="Comprehension" values={comprehension} color="#14b8a6" fillColor="#ccfbf1" unit="%" />
+                )}
+              </div>
+            </div>
+          )
+        })()}
 
         {/* Difficult words */}
         {difficultWords.length > 0 && (

@@ -40,6 +40,29 @@ describe('AuthContext — sign-in loading state', () => {
     resolveProfile = null
   })
 
+  it('does not set loading=true on TOKEN_REFRESHED when profile is already loaded', async () => {
+    render(<AuthProvider><TestConsumer /></AuthProvider>)
+
+    // Sign in and resolve profile
+    act(() => {
+      authStateCallback('SIGNED_IN', { user: { id: 'user-123' } })
+    })
+    await act(async () => {
+      resolveProfile({ data: { id: 'user-123', role: 'student' } })
+    })
+    expect(screen.getByTestId('loading').textContent).toBe('false')
+    expect(screen.getByTestId('profile').textContent).toBe('student')
+
+    // Tab regains focus — Supabase fires TOKEN_REFRESHED
+    act(() => {
+      authStateCallback('TOKEN_REFRESHED', { user: { id: 'user-123' } })
+    })
+
+    // loading must stay false — no page flash
+    expect(screen.getByTestId('loading').textContent).toBe('false')
+    expect(screen.getByTestId('profile').textContent).toBe('student')
+  })
+
   it('sets loading=true while profile is being fetched after sign-in', async () => {
     render(<AuthProvider><TestConsumer /></AuthProvider>)
 

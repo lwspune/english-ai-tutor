@@ -9,7 +9,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Backend Integrity
 - Enforce data rules at the DB level (FK, CHECK constraints, NOT NULL, triggers), not just in app code. Validate and reject bad input at the edge function boundary before any external API call (fail fast). Use transactions for multi-step writes. Return a consistent shape: `{ data }` on success, `{ error }` on failure. Keep all scoring and business logic server-side — never in client JS.
-- **Known violation:** `gradeAnswers()` in `src/lib/comprehension.js` runs client-side — a student can manipulate scores before they're saved. Should move to an edge function or DB RPC.
 
 ### No over-engineering
 - Don't over-engineer or over-complicate. Prefer the simplest solution that satisfies the requirement. Avoid premature abstractions, unnecessary layers, and speculative generality.

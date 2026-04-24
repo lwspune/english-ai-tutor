@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { gradeAnswers } from '../../lib/comprehension'
 import QuizForm from '../../components/QuizForm'
 
 export default function ComprehensionQuiz() {
@@ -28,7 +27,7 @@ export default function ComprehensionQuiz() {
 
       const { data: qs } = await supabase
         .from('questions')
-        .select('*')
+        .select('id, question_text, options, display_order')
         .eq('passage_id', session.passage_id)
         .order('display_order')
 
@@ -45,11 +44,10 @@ export default function ComprehensionQuiz() {
 
   async function handleSubmit(answers) {
     setSubmitting(true)
-    const { score, answers: graded } = gradeAnswers(questions, answers)
-    await supabase
-      .from('sessions')
-      .update({ score_comprehension: score, comprehension_answers: graded })
-      .eq('id', sessionId)
+    await supabase.rpc('grade_comprehension', {
+      p_session_id: sessionId,
+      p_answers: answers,
+    })
     navigate(`/student/report/${sessionId}`, { replace: true })
   }
 

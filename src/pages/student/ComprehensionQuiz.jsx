@@ -9,6 +9,8 @@ export default function ComprehensionQuiz() {
   const [passage, setPassage] = useState(null)
   const [questions, setQuestions] = useState(null)
   const [submitting, setSubmitting] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  const [pendingAnswers, setPendingAnswers] = useState(null)
 
   useEffect(() => {
     async function load() {
@@ -20,7 +22,6 @@ export default function ComprehensionQuiz() {
 
       if (!session) { navigate('/student'); return }
 
-      // already answered — go back to report
       if (session.comprehension_answers !== null) {
         navigate(`/student/report/${sessionId}`, { replace: true })
         return
@@ -31,7 +32,6 @@ export default function ComprehensionQuiz() {
         supabase.from('passages').select('title, content').eq('id', session.passage_id).single(),
       ])
 
-      // no questions for this passage
       if (!qs || qs.length === 0) {
         navigate(`/student/report/${sessionId}`, { replace: true })
         return
@@ -43,11 +43,17 @@ export default function ComprehensionQuiz() {
     load()
   }, [sessionId, navigate])
 
-  async function handleSubmit(answers) {
+  function handleSubmit(answers) {
+    setPendingAnswers(answers)
+    setConfirming(true)
+  }
+
+  async function confirmSubmit() {
+    setConfirming(false)
     setSubmitting(true)
     await supabase.rpc('grade_comprehension', {
       p_session_id: sessionId,
-      p_answers: answers,
+      p_answers: pendingAnswers,
     })
     navigate(`/student/report/${sessionId}`, { replace: true })
   }
@@ -92,6 +98,29 @@ export default function ComprehensionQuiz() {
           <QuizForm questions={questions} onSubmit={handleSubmit} />
         )}
       </main>
+
+      {confirming && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
+            <h2 id="confirm-title" className="text-base font-semibold text-gray-800 mb-2">Submit your answers?</h2>
+            <p className="text-sm text-gray-500 mb-6">Once submitted, your answers cannot be changed.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirming(false)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 min-h-[44px]"
+              >
+                Go back
+              </button>
+              <button
+                onClick={confirmSubmit}
+                className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 min-h-[44px]"
+              >
+                Submit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

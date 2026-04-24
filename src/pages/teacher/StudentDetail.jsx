@@ -77,6 +77,13 @@ export default function StudentDetail() {
   const wpmTarget = WPM_TARGETS[student.grade] ?? 150
   const difficultWords = computeDifficultWords(sessions)
 
+  async function handleResetComprehension(sessionId) {
+    await supabase.rpc('reset_comprehension', { p_session_id: sessionId })
+    setSessions(prev => prev.map(s =>
+      s.id === sessionId ? { ...s, score_comprehension: null, comprehension_answers: null } : s
+    ))
+  }
+
   const avgAccuracy = sessions.length
     ? Math.round(sessions.reduce((a, s) => a + s.score_accuracy, 0) / sessions.length)
     : null
@@ -252,12 +259,24 @@ export default function StudentDetail() {
                           {s.count_substitutions ?? '—'}
                         </td>
                         {s.score_comprehension != null ? (
-                          <TrendCell
-                            value={s.score_comprehension}
-                            display={`${s.score_comprehension}%`}
-                            prev={prev?.score_comprehension ?? null}
-                            goodDirection="up"
-                          />
+                          <td className="px-3 py-3 text-center">
+                            <span className="font-semibold text-gray-800">{s.score_comprehension}%</span>
+                            {trend(s.score_comprehension, prev?.score_comprehension ?? null) && (
+                              <span className={`ml-1 text-xs font-bold ${
+                                trend(s.score_comprehension, prev?.score_comprehension ?? null) === '↑'
+                                  ? 'text-green-500' : 'text-red-400'
+                              }`}>
+                                {trend(s.score_comprehension, prev?.score_comprehension ?? null)}
+                              </span>
+                            )}
+                            <button
+                              onClick={() => handleResetComprehension(s.id)}
+                              className="block mx-auto mt-0.5 text-xs text-red-400 hover:text-red-600 focus-visible:outline-none focus-visible:underline"
+                              aria-label={`Reset comprehension for session ${i + 1}`}
+                            >
+                              Reset
+                            </button>
+                          </td>
                         ) : (
                           <td className="px-3 py-3 text-center text-gray-300 text-xs">—</td>
                         )}

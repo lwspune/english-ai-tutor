@@ -60,7 +60,7 @@ English reading-aloud evaluation app for high school students (grades 9–12) wi
 **Deployed:** Frontend on Vercel, edge function on Supabase (ap-south-1), repo: github.com/lwspune/english-ai-tutor.
 
 ### Data flow for a reading session
-1. Student opens a passage → records audio via `useAudioRecorder` (MediaRecorder → WebM blob). Recording auto-stops at `max(60s, word_count / 70 * 1.5 * 60)` seconds.
+1. Student opens a passage → `ReadingSession` fetches existing session count and shows "Attempt X of 3"; Start Recording is disabled if all 3 are used. Records audio via `useAudioRecorder` (MediaRecorder → WebM blob). Recording auto-stops at `max(60s, word_count / 70 * 1.5 * 60)` seconds.
 2. Audio uploaded to Supabase Storage bucket `audio` under `{studentId}/{timestamp}.webm`
 3. Frontend reads `app_settings.ai_feedback_enabled` and passes it along with `grade` to the edge function
 4. Edge function `analyze-reading`:
@@ -91,10 +91,11 @@ English reading-aloud evaluation app for high school students (grades 9–12) wi
 After a reading session, if the passage has questions attached:
 1. `SessionReport` shows an "Answer Comprehension Questions" button (only when not yet answered)
 2. Student navigates to `/student/comprehension/:sessionId` — `ComprehensionQuiz` page
-3. All questions shown at once (3–5 per passage); submit button disabled until all answered
-4. Answers graded client-side via `gradeAnswers()` in `src/lib/comprehension.js`
-5. Session updated with `score_comprehension` (0–100) and `comprehension_answers` (jsonb)
-6. Student redirected back to report — comprehension score ring + per-question results shown
+3. Passage text shown in a scrollable card (max-h-48) above the questions so the student can refer back
+4. All questions shown at once (3–5 per passage); submit button disabled until all answered
+5. Answers graded server-side via `grade_comprehension` RPC — `correct_index` is never sent to the client
+6. Session updated with `score_comprehension` (0–100) and `comprehension_answers` (jsonb)
+7. Student redirected back to report — comprehension score ring + per-question results shown
 - Quiz is **once-only per session** — revisiting the route redirects back to report
 - `ComprehensionQuiz` also redirects silently if the passage has no questions
 

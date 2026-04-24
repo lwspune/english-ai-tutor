@@ -6,6 +6,7 @@ import QuizForm from '../../components/QuizForm'
 export default function ComprehensionQuiz() {
   const { sessionId } = useParams()
   const navigate = useNavigate()
+  const [passage, setPassage] = useState(null)
   const [questions, setQuestions] = useState(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -25,11 +26,10 @@ export default function ComprehensionQuiz() {
         return
       }
 
-      const { data: qs } = await supabase
-        .from('questions')
-        .select('id, question_text, options, display_order')
-        .eq('passage_id', session.passage_id)
-        .order('display_order')
+      const [{ data: qs }, { data: p }] = await Promise.all([
+        supabase.from('questions').select('id, question_text, options, display_order').eq('passage_id', session.passage_id).order('display_order'),
+        supabase.from('passages').select('title, content').eq('id', session.passage_id).single(),
+      ])
 
       // no questions for this passage
       if (!qs || qs.length === 0) {
@@ -37,6 +37,7 @@ export default function ComprehensionQuiz() {
         return
       }
 
+      setPassage(p)
       setQuestions(qs)
     }
     load()
@@ -71,8 +72,16 @@ export default function ComprehensionQuiz() {
         <h1 className="text-base font-semibold text-gray-800">Comprehension Quiz</h1>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-6">
-        <p className="text-sm text-gray-500 mb-6">
+      <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+        {passage && (
+          <div className="bg-white rounded-2xl border border-gray-200 p-5">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">{passage.title}</p>
+            <div className="max-h-48 overflow-y-auto">
+              <p className="text-gray-700 leading-relaxed text-sm">{passage.content}</p>
+            </div>
+          </div>
+        )}
+        <p className="text-sm text-gray-500">
           Answer all {questions.length} questions, then tap Submit.
         </p>
         {submitting ? (

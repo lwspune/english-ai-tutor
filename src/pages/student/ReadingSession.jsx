@@ -11,6 +11,7 @@ export default function ReadingSession() {
   const navigate = useNavigate()
   const [passage, setPassage] = useState(null)
   const [aiFeedbackEnabled, setAiFeedbackEnabled] = useState(true)
+  const [attemptCount, setAttemptCount] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const maxDurationSec = passage ? Math.max(60, Math.round(passage.word_count / 70 * 60 * 1.5)) : 180
@@ -18,15 +19,17 @@ export default function ReadingSession() {
 
   useEffect(() => {
     async function load() {
-      const [{ data: p }, { data: s }] = await Promise.all([
+      const [{ data: p }, { data: s }, { count }] = await Promise.all([
         supabase.from('passages').select('*').eq('id', passageId).single(),
         supabase.from('app_settings').select('ai_feedback_enabled').single(),
+        supabase.from('sessions').select('*', { count: 'exact', head: true }).eq('student_id', profile.id).eq('passage_id', passageId),
       ])
       setPassage(p)
       setAiFeedbackEnabled(s?.ai_feedback_enabled ?? true)
+      setAttemptCount(count ?? 0)
     }
     load()
-  }, [passageId])
+  }, [passageId, profile.id])
 
   async function handleSubmit() {
     if (!audioBlob) return
@@ -39,8 +42,6 @@ export default function ReadingSession() {
         .from('audio')
         .upload(filename, audioBlob)
       if (uploadError) throw uploadError
-
-      const { data: { publicUrl } } = supabase.storage.from('audio').getPublicUrl(filename)
 
       const { data, error: fnError } = await supabase.functions.invoke('analyze-reading', {
         body: { audioPath: filename, passageText: passage.content, studentId: profile.id, passageId, grade: profile.grade, aiFeedbackEnabled },
@@ -77,6 +78,13 @@ export default function ReadingSession() {
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-4">
+          {attemptCount !== null && (
+            <p className={`text-xs text-center font-medium ${attemptCount >= 3 ? 'text-red-500' : 'text-gray-400'}`}>
+              {attemptCount >= 3
+                ? 'You have used all 3 attempts for this passage.'
+                : `Attempt ${attemptCount + 1} of 3`}
+            </p>
+          )}
           <p className="text-sm font-medium text-gray-700 text-center">
             {recording
               ? `Recording... read the passage aloud`
@@ -94,7 +102,8 @@ export default function ReadingSession() {
             {!recording && !audioBlob && (
               <button
                 onClick={startRecording}
-                className="bg-red-500 text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-red-600 transition-colors flex items-center gap-2"
+                disabled={attemptCount >= 3}
+                className="bg-red-500 text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-red-600 transition-colors flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <span className="w-2 h-2 bg-white rounded-full" />
                 Start Recording

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/AuthContext'
 import { useAudioRecorder } from '../../hooks/useAudioRecorder'
+import { extractEdgeFunctionError } from '../../lib/edgeFunctionError'
 
 export default function ReadingSession() {
   const { passageId } = useParams()
@@ -45,8 +46,7 @@ export default function ReadingSession() {
         body: { audioPath: filename, passageText: passage.content, studentId: profile.id, passageId, grade: profile.grade, aiFeedbackEnabled },
       })
       if (fnError) {
-        const msg = data?.error || fnError.message
-        throw new Error(msg)
+        throw new Error(await extractEdgeFunctionError(fnError))
       }
 
       navigate(`/student/report/${data.sessionId}`)

@@ -63,6 +63,29 @@ describe('AuthContext — sign-in loading state', () => {
     expect(screen.getByTestId('profile').textContent).toBe('student')
   })
 
+  it('does not set loading=true on SIGNED_IN when the same user is already authenticated', async () => {
+    render(<AuthProvider><TestConsumer /></AuthProvider>)
+
+    // Sign in and resolve profile
+    act(() => {
+      authStateCallback('SIGNED_IN', { user: { id: 'user-123' } })
+    })
+    await act(async () => {
+      resolveProfile({ data: { id: 'user-123', role: 'student' } })
+    })
+    expect(screen.getByTestId('loading').textContent).toBe('false')
+    expect(screen.getByTestId('profile').textContent).toBe('student')
+
+    // Tab regains focus — Supabase fires SIGNED_IN with same user after token expiry + refresh
+    act(() => {
+      authStateCallback('SIGNED_IN', { user: { id: 'user-123' } })
+    })
+
+    // loading must stay false — no page flash
+    expect(screen.getByTestId('loading').textContent).toBe('false')
+    expect(screen.getByTestId('profile').textContent).toBe('student')
+  })
+
   it('sets loading=true while profile is being fetched after sign-in', async () => {
     render(<AuthProvider><TestConsumer /></AuthProvider>)
 

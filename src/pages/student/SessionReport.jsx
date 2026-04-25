@@ -103,6 +103,7 @@ export default function SessionReport() {
   const [session, setSession] = useState(null)
   const [grade, setGrade] = useState(null)
   const [questions, setQuestions] = useState([])
+  const [personalBest, setPersonalBest] = useState(null)
 
   useEffect(() => {
     async function load() {
@@ -113,12 +114,28 @@ export default function SessionReport() {
         .single()
       setSession(s)
 
-      const [{ data: p }, { data: qs }] = await Promise.all([
+      const [{ data: p }, { data: qs }, { data: prev }] = await Promise.all([
         supabase.from('profiles').select('grade').eq('id', s?.student_id).single(),
         supabase.from('questions').select('*').eq('passage_id', s?.passage_id).order('display_order'),
+        supabase.from('sessions')
+          .select('score_accuracy, score_wpm')
+          .eq('passage_id', s?.passage_id)
+          .eq('student_id', s?.student_id)
+          .neq('id', sessionId),
       ])
       setGrade(p?.grade ?? null)
       setQuestions(qs ?? [])
+
+      if (prev && prev.length > 0) {
+        const prevBestAccuracy = Math.max(...prev.map(r => r.score_accuracy))
+        const prevBestWpm = Math.max(...prev.map(r => r.score_wpm))
+        setPersonalBest({
+          newAccuracy: s.score_accuracy > prevBestAccuracy,
+          newWpm: s.score_wpm > prevBestWpm,
+          prevBestAccuracy,
+          prevBestWpm,
+        })
+      }
     }
     load()
   }, [sessionId])
@@ -151,6 +168,23 @@ export default function SessionReport() {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+        {personalBest && (personalBest.newAccuracy || personalBest.newWpm) && (
+          <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+            <p className="text-sm font-semibold text-green-700">New personal best!</p>
+            <p className="text-xs text-green-600 mt-0.5">
+              {[
+                personalBest.newAccuracy && `Accuracy: ${session.score_accuracy}% (was ${personalBest.prevBestAccuracy}%)`,
+                personalBest.newWpm && `WPM: ${session.score_wpm} (was ${personalBest.prevBestWpm})`,
+              ].filter(Boolean).join(' · ')}
+            </p>
+          </div>
+        )}
+        {personalBest && !personalBest.newAccuracy && !personalBest.newWpm && (
+          <p className="text-xs text-gray-400 px-1">
+            Your best on this passage — Accuracy: {personalBest.prevBestAccuracy}% · WPM: {personalBest.prevBestWpm}
+          </p>
+        )}
+
         {/* Scores */}
         <div className="bg-white rounded-2xl border border-gray-200 p-5">
           <p className="text-xs text-gray-400 mb-1">{new Date(session.created_at).toLocaleString()}</p>

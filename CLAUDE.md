@@ -27,6 +27,28 @@ Students learn better when they can see their own trajectory. Every metric we tr
 ### Growth-Framed Feedback
 Feedback must name what went well and what to work on next — never just a score. The GPT feedback fields (`wentWell`, `focusOn`, `tip`) encode this. Any new feedback surface must follow the same pattern.
 
+## Engagement Mechanics
+
+These mechanics keep students returning and make progress feel real. Apply them when building any student-facing feature. Never use manipulative patterns (variable rewards, loss aversion, social pressure) — this is a school context with minors.
+
+### Streaks (habit formation)
+Daily reading habit is the goal. Show a streak counter for consecutive school days (Mon–Fri) with at least one session. Weekends don't break the streak. A missed school day does. Streak shows even before today's session is done (it's "at risk", not broken). Never punish a broken streak — just reset to 0 and let the student rebuild. Implementation: `src/lib/streak.js` → `computeStreak(sessions, today)`.
+
+### Personal Best (competence + progress)
+After every scored attempt, compare against all previous attempts on the same item. Show "New personal best!" with the specific improvement (accuracy %, WPM). If not a new best, show the current best quietly so the student knows what to aim for. Track accuracy and WPM independently — either improving is worth celebrating. Never show a score in isolation without context of where the student has been.
+
+### Milestones (completion momentum)
+Mark real learning events, not arbitrary game points. Good milestones: first 80%+ accuracy, 5-passage streak, improved accuracy week-over-week, first comprehension quiz completed. Bad milestones: "logged in 3 days in a row", "earned 100 XP". Each milestone must correspond to a genuine learning achievement.
+
+### Weekly summary (habit anchor)
+Show a brief summary on the first login of a new week: passages read, accuracy trend, streak status. One screen, no navigation required. Drives return visits by making the week's work visible.
+
+### What to avoid
+- Leaderboards: demotivate the bottom half of the class in a known-peer setting.
+- Hearts / lives: create anxiety, not learning.
+- Variable rewards / loot boxes: exploitative, no learning benefit.
+- Streak shields or freezes: adds complexity without learning value.
+
 ## Development Preferences
 
 ### UI

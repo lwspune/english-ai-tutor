@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/AuthContext'
 import { classifyPassages } from '../../lib/passageClassifier'
+import { computeStreak } from '../../lib/streak'
 
 export default function StudentHome() {
   const { profile, signOut } = useAuth()
@@ -10,6 +11,8 @@ export default function StudentHome() {
   const [todo, setTodo] = useState([])
   const [retry, setRetry] = useState([])
   const [sessions, setSessions] = useState([])
+  const [streak, setStreak] = useState(0)
+  const [hasReadToday, setHasReadToday] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -20,8 +23,13 @@ export default function StudentHome() {
       ])
       const allSessions = s ?? []
       const { todo, retry } = classifyPassages(p ?? [], allSessions)
+      const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
       setTodo(todo)
       setRetry(retry)
+      setStreak(computeStreak(allSessions))
+      setHasReadToday(allSessions.some(
+        s => new Date(s.created_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }) === todayStr
+      ))
       setSessions(allSessions.slice(0, 10))
       setLoading(false)
     }
@@ -50,6 +58,20 @@ export default function StudentHome() {
           </div>
           <span className="text-blue-400 text-lg" aria-hidden="true">→</span>
         </button>
+
+        {streak > 0 && (
+          <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-orange-700">
+                {streak}-day streak
+              </p>
+              <p className="text-xs text-orange-400 mt-0.5">
+                {hasReadToday ? 'Session done for today — keep it going tomorrow' : 'Read a passage today to keep your streak'}
+              </p>
+            </div>
+            <span className="text-3xl font-bold text-orange-200">{streak}</span>
+          </div>
+        )}
 
         <section>
           <h2 className="text-base font-semibold text-gray-700 mb-3">Assigned Passages</h2>

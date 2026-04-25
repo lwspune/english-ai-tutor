@@ -57,12 +57,6 @@ Show a brief summary on the first login of a new week: passages read, accuracy t
 ### Backend Integrity
 - Enforce data rules at the DB level (FK, CHECK constraints, NOT NULL, triggers), not just in app code. Validate and reject bad input at the edge function boundary before any external API call (fail fast). Use transactions for multi-step writes. Return a consistent shape: `{ data }` on success, `{ error }` on failure. Keep all scoring and business logic server-side — never in client JS.
 
-### No over-engineering
-- Don't over-engineer or over-complicate. Prefer the simplest solution that satisfies the requirement. Avoid premature abstractions, unnecessary layers, and speculative generality.
-
-### Comments
-- Default to no comments. Only add one when the WHY is non-obvious and cannot be expressed through naming or structure (e.g. a hidden constraint, a workaround for a specific bug, a deliberate trade-off). Never explain what the code does — well-named identifiers do that. Never leave commented-out dead code.
-
 ### Accessibility
 - Use Tailwind `focus-visible:` utilities for focus styles on all interactive elements.
 
@@ -128,8 +122,6 @@ English reading-aloud evaluation app for high school students (grades 9–12) wi
 - **Omissions** — passage words skipped entirely
 - **Substitutions** — wrong word said in place of a passage word
 
-WPM targets live in `src/lib/wpmTargets.js` — import from there, never hardcode.
-
 ### AI Feedback structure (GPT-4o-mini, stored as JSON in `feedback` column)
 ```json
 { "wentWell": "...", "focusOn": "...", "practiseWords": ["word1"], "tip": "..." }
@@ -151,7 +143,7 @@ After a reading session, if the passage has questions attached:
 - Teacher can reset a student's comprehension attempt via the `reset_comprehension` RPC (button in StudentDetail Comp. column)
 
 ### Student pages
-- `StudentHome` (`/student`) — "Assigned Passages" (never attempted) + "Keep Practising" (amber, below 80% mastery with attempts left) + streak card + last 10 sessions; "My Progress" banner navigates to `/student/progress`
+- `StudentHome` (`/student`) — "Assigned Passages" (new) + "Keep Practising" (amber, <80% mastery, attempts left) + streak card + last 10 sessions + "My Progress" banner
 - `ReadingSession` (`/student/session/:passageId`) — audio recording
 - `SessionReport` (`/student/report/:sessionId`) — word-by-word results + feedback + personal best banner (accuracy + WPM vs prior attempts on same passage) + comprehension CTA
 - `ComprehensionQuiz` (`/student/comprehension/:sessionId`) — once-only quiz with confirmation modal

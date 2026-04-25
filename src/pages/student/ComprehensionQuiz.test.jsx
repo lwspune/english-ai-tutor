@@ -75,7 +75,10 @@ describe('ComprehensionQuiz', () => {
 
     fireEvent.click(screen.getByLabelText('Shakespeare'))
     fireEvent.click(screen.getByLabelText('1600'))
-    fireEvent.click(screen.getByRole('button', { name: /submit/i }))
+    fireEvent.click(screen.getByRole('button', { name: /submit answers/i }))
+
+    await waitFor(() => screen.getByRole('dialog'))
+    fireEvent.click(screen.getByRole('button', { name: /^submit$/i }))
 
     await waitFor(() => expect(mockRpc).toHaveBeenCalledWith('grade_comprehension', {
       p_session_id: 'session-abc',
@@ -92,7 +95,10 @@ describe('ComprehensionQuiz', () => {
 
     fireEvent.click(screen.getByLabelText('Shakespeare'))
     fireEvent.click(screen.getByLabelText('1600'))
-    fireEvent.click(screen.getByRole('button', { name: /submit/i }))
+    fireEvent.click(screen.getByRole('button', { name: /submit answers/i }))
+
+    await waitFor(() => screen.getByRole('dialog'))
+    fireEvent.click(screen.getByRole('button', { name: /^submit$/i }))
 
     await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith(
       '/student/report/session-abc', { replace: true }

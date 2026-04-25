@@ -106,6 +106,7 @@ English reading-aloud evaluation app for high school students (grades 9–12) wi
 3. Frontend reads `app_settings.ai_feedback_enabled` and passes it along with `grade` to the edge function
 4. Edge function `analyze-reading`:
    - Checks attempt count (max 3 per passage per student) — rejects before any API call if exceeded
+   - Checks daily session limit (`app_settings.daily_session_limit`, default 5) — rejects if student has already hit today's cap (IST timezone); deletes uploaded audio on reject
    - Checks audio blob size (min 5 KB) — rejects silent/accidental recordings
    - Calls Whisper API (`verbose_json`, word-level timestamps)
    - Aligns spoken words to passage using DP sequence alignment (not positional matching)
@@ -143,14 +144,15 @@ After a reading session, if the passage has questions attached:
 - Teacher can reset a student's comprehension attempt via the `reset_comprehension` RPC (button in StudentDetail Comp. column)
 
 ### Student pages
-- `StudentHome` (`/student`) — "Assigned Passages" (new) + "Keep Practising" (amber, <80% mastery, attempts left) + streak card + last 10 sessions + "My Progress" banner
-- `ReadingSession` (`/student/session/:passageId`) — audio recording
+- `StudentHome` (`/student`) — "Assigned Passages" (new) + "Keep Practising" (amber, <80% mastery, attempts left) + streak card + daily counter chip (X of N today, red at limit) + last 10 sessions + "My Progress" banner
+- `ReadingSession` (`/student/session/:passageId`) — audio recording; Start Recording disabled when per-passage attempt limit (3) OR daily session limit is reached
 - `SessionReport` (`/student/report/:sessionId`) — word-by-word results + feedback + personal best banner (accuracy + WPM vs prior attempts on same passage) + comprehension CTA
 - `ComprehensionQuiz` (`/student/comprehension/:sessionId`) — once-only quiz with confirmation modal
 - `StudentProgress` (`/student/progress`) — sparkline trend charts for Accuracy, Pace, Phrasing, Comprehension
 
 ### Teacher dashboard
 - **AI Feedback toggle** — global on/off button in the header, persisted in `app_settings` table
+- **Daily limit stepper** — −/N/+ control in header (clamped 1–20); updates `app_settings.daily_session_limit` immediately
 - **Class code display** — shown in header with one-tap copy; students use this code to self-register
 - **Passage Completion** (`/teacher/completion`) — per-passage cards showing count completed + chips for students who haven't read yet; chips link to student detail
 - **Student detail** (`/teacher/student/:id`) — summary stats, sparkline performance trends (Accuracy, Pace, Phrasing, Comprehension), recurring difficult words, session progress table with ↑/↓ trend arrows and comprehension Reset button
@@ -175,7 +177,7 @@ After a reading session, if the passage has questions attached:
 - `passages` — `word_count` computed client-side on insert in `PassageManager`
 - `sessions` — `word_results` JSONB `[{ word, spoken, status }]`, status ∈ `correct | substitution | omission`; also stores `score_accuracy`, `score_wpm`, `score_phrasing`, `score_fluency` (same as phrasing, kept for compat), `count_omissions`, `count_substitutions`, `feedback` (JSON string or plain text), `score_comprehension` (int nullable), `comprehension_answers` (jsonb nullable — `[{ question_id, selected_index, is_correct }]`)
 - `questions` — `passage_id` FK, `question_text`, `options` (jsonb array of 4 strings), `correct_index` (0–3), `display_order`; max 5 per passage enforced by DB trigger `enforce_question_limit`
-- `app_settings` — single-row table (`id boolean PK default true`), holds `ai_feedback_enabled boolean`, `class_code text` (random 6-char code set on migration; teacher shares with students for self-registration)
+- `app_settings` — single-row table (`id boolean PK default true`), holds `ai_feedback_enabled boolean`, `class_code text` (random 6-char code set on migration; teacher shares with students for self-registration), `daily_session_limit int` (default 5; teacher adjusts via dashboard stepper, clamped 1–20)
 - RLS on all tables. `is_teacher()` security definer function used in profiles policy to avoid infinite recursion.
 
 ### RPCs

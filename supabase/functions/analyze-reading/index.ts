@@ -213,6 +213,30 @@ Deno.serve(async (req) => {
       )
     }
 
+    // Guardrail 2: daily session limit
+    const { data: settings } = await supabase
+      .from('app_settings')
+      .select('daily_session_limit')
+      .single()
+    const dailyLimit = settings?.daily_session_limit ?? 5
+    const istOffsetMs = 330 * 60 * 1000 // UTC+5:30
+    const istNow = new Date(Date.now() + istOffsetMs)
+    const istMidnightUtc = new Date(
+      Date.UTC(istNow.getUTCFullYear(), istNow.getUTCMonth(), istNow.getUTCDate()) - istOffsetMs,
+    )
+    const { count: todayCount } = await supabase
+      .from('sessions')
+      .select('*', { count: 'exact', head: true })
+      .eq('student_id', studentId)
+      .gte('created_at', istMidnightUtc.toISOString())
+    if ((todayCount ?? 0) >= dailyLimit) {
+      await supabase.storage.from('audio').remove([audioPath])
+      return new Response(
+        JSON.stringify({ error: `You've reached today's limit of ${dailyLimit} passages. Come back tomorrow.` }),
+        { status: 429, headers: corsHeaders },
+      )
+    }
+
     // Download audio
     const { data: audioData, error: dlError } = await supabase.storage
       .from('audio')

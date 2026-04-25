@@ -13,23 +13,29 @@ export default function StudentHome() {
   const [sessions, setSessions] = useState([])
   const [streak, setStreak] = useState(0)
   const [hasReadToday, setHasReadToday] = useState(false)
+  const [todayCount, setTodayCount] = useState(0)
+  const [dailyLimit, setDailyLimit] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function load() {
-      const [{ data: p }, { data: s }] = await Promise.all([
+      const [{ data: p }, { data: s }, { data: settings }] = await Promise.all([
         supabase.from('passages').select('*').order('created_at', { ascending: false }),
         supabase.from('sessions').select('*, passages(title)').eq('student_id', profile.id).order('created_at', { ascending: false }),
+        supabase.from('app_settings').select('daily_session_limit').single(),
       ])
       const allSessions = s ?? []
       const { todo, retry } = classifyPassages(p ?? [], allSessions)
       const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
+      const countToday = allSessions.filter(
+        s => new Date(s.created_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }) === todayStr
+      ).length
       setTodo(todo)
       setRetry(retry)
       setStreak(computeStreak(allSessions))
-      setHasReadToday(allSessions.some(
-        s => new Date(s.created_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }) === todayStr
-      ))
+      setHasReadToday(countToday > 0)
+      setTodayCount(countToday)
+      setDailyLimit(settings?.daily_session_limit ?? 5)
       setSessions(allSessions.slice(0, 10))
       setLoading(false)
     }
@@ -70,6 +76,23 @@ export default function StudentHome() {
               </p>
             </div>
             <span className="text-3xl font-bold text-orange-200">{streak}</span>
+          </div>
+        )}
+
+        {dailyLimit !== null && (
+          <div className={`rounded-xl border px-4 py-3 flex items-center justify-between ${
+            todayCount >= dailyLimit
+              ? 'bg-red-50 border-red-200'
+              : 'bg-gray-50 border-gray-200'
+          }`}>
+            <p className={`text-sm font-medium ${todayCount >= dailyLimit ? 'text-red-600' : 'text-gray-600'}`}>
+              {todayCount >= dailyLimit
+                ? `Daily limit reached — come back tomorrow`
+                : `${todayCount} of ${dailyLimit} passages read today`}
+            </p>
+            <span className={`text-sm font-bold ${todayCount >= dailyLimit ? 'text-red-300' : 'text-gray-300'}`}>
+              {todayCount}/{dailyLimit}
+            </span>
           </div>
         )}
 

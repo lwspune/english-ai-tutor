@@ -12,6 +12,8 @@ export default function TeacherDashboard() {
   const [togglingAi, setTogglingAi] = useState(false)
   const [classCode, setClassCode] = useState('')
   const [codeCopied, setCodeCopied] = useState(false)
+  const [dailyLimit, setDailyLimit] = useState(null)
+  const [updatingLimit, setUpdatingLimit] = useState(false)
 
   function copyCode() {
     navigator.clipboard.writeText(classCode)
@@ -30,12 +32,25 @@ export default function TeacherDashboard() {
     setTogglingAi(false)
   }
 
+  async function updateDailyLimit(next) {
+    const clamped = Math.max(1, Math.min(20, next))
+    if (clamped === dailyLimit || updatingLimit) return
+    setUpdatingLimit(true)
+    const { error } = await supabase
+      .from('app_settings')
+      .update({ daily_session_limit: clamped })
+      .eq('id', true)
+    if (!error) setDailyLimit(clamped)
+    setUpdatingLimit(false)
+  }
+
   useEffect(() => {
-    supabase.from('app_settings').select('ai_feedback_enabled, class_code').single()
+    supabase.from('app_settings').select('ai_feedback_enabled, class_code, daily_session_limit').single()
       .then(({ data }) => {
         if (data) {
           setAiFeedback(data.ai_feedback_enabled)
           setClassCode(data.class_code ?? '')
+          setDailyLimit(data.daily_session_limit ?? 5)
         }
       })
   }, [])
@@ -95,6 +110,24 @@ export default function TeacherDashboard() {
               <span className="font-semibold tracking-widest">{classCode}</span>
               <span className="text-gray-400">{codeCopied ? '✓' : '⎘'}</span>
             </button>
+          )}
+          {dailyLimit !== null && (
+            <div className="flex items-center gap-1.5" aria-label="Daily passage limit per student">
+              <span className="text-xs text-gray-500">Daily limit:</span>
+              <button
+                onClick={() => updateDailyLimit(dailyLimit - 1)}
+                disabled={dailyLimit <= 1 || updatingLimit}
+                className="w-7 h-7 flex items-center justify-center rounded-md border border-gray-300 text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                aria-label="Decrease daily limit"
+              >−</button>
+              <span className="w-5 text-center text-sm font-semibold text-gray-800">{dailyLimit}</span>
+              <button
+                onClick={() => updateDailyLimit(dailyLimit + 1)}
+                disabled={dailyLimit >= 20 || updatingLimit}
+                className="w-7 h-7 flex items-center justify-center rounded-md border border-gray-300 text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                aria-label="Increase daily limit"
+              >+</button>
+            </div>
           )}
           <button
             onClick={toggleAiFeedback}

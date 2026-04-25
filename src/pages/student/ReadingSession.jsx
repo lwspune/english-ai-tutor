@@ -12,21 +12,33 @@ export default function ReadingSession() {
   const [passage, setPassage] = useState(null)
   const [aiFeedbackEnabled, setAiFeedbackEnabled] = useState(true)
   const [attemptCount, setAttemptCount] = useState(null)
+  const [dailyCount, setDailyCount] = useState(null)
+  const [dailyLimit, setDailyLimit] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const maxDurationSec = passage ? Math.max(60, Math.round(passage.word_count / 70 * 60 * 1.5)) : 180
+  const dailyLimitReached = dailyCount !== null && dailyLimit !== null && dailyCount >= dailyLimit
   const { recording, audioBlob, autoStopped, remaining, startRecording, stopRecording, reset } = useAudioRecorder(maxDurationSec)
 
   useEffect(() => {
     async function load() {
-      const [{ data: p }, { data: s }, { count }] = await Promise.all([
+      const istOffsetMs = 330 * 60 * 1000
+      const istNow = new Date(Date.now() + istOffsetMs)
+      const istMidnightUtc = new Date(
+        Date.UTC(istNow.getUTCFullYear(), istNow.getUTCMonth(), istNow.getUTCDate()) - istOffsetMs,
+      ).toISOString()
+
+      const [{ data: p }, { data: s }, { count: attempts }, { count: todayCount }] = await Promise.all([
         supabase.from('passages').select('*').eq('id', passageId).single(),
-        supabase.from('app_settings').select('ai_feedback_enabled').single(),
+        supabase.from('app_settings').select('ai_feedback_enabled, daily_session_limit').single(),
         supabase.from('sessions').select('*', { count: 'exact', head: true }).eq('student_id', profile.id).eq('passage_id', passageId),
+        supabase.from('sessions').select('*', { count: 'exact', head: true }).eq('student_id', profile.id).gte('created_at', istMidnightUtc),
       ])
       setPassage(p)
       setAiFeedbackEnabled(s?.ai_feedback_enabled ?? true)
-      setAttemptCount(count ?? 0)
+      setAttemptCount(attempts ?? 0)
+      setDailyCount(todayCount ?? 0)
+      setDailyLimit(s?.daily_session_limit ?? 5)
     }
     load()
   }, [passageId, profile.id])
@@ -78,7 +90,12 @@ export default function ReadingSession() {
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-4">
-          {attemptCount !== null && (
+          {dailyLimitReached && (
+            <p className="text-xs text-center font-medium text-red-500">
+              You've reached today's limit of {dailyLimit} passages. Come back tomorrow.
+            </p>
+          )}
+          {!dailyLimitReached && attemptCount !== null && (
             <p className={`text-xs text-center font-medium ${attemptCount >= 3 ? 'text-red-500' : 'text-gray-400'}`}>
               {attemptCount >= 3
                 ? 'You have used all 3 attempts for this passage.'
@@ -102,7 +119,7 @@ export default function ReadingSession() {
             {!recording && !audioBlob && (
               <button
                 onClick={startRecording}
-                disabled={attemptCount >= 3}
+                disabled={attemptCount >= 3 || dailyLimitReached}
                 className="bg-red-500 text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-red-600 transition-colors flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <span className="w-2 h-2 bg-white rounded-full" />

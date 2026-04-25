@@ -31,16 +31,16 @@ Feedback must name what went well and what to work on next — never just a scor
 
 These mechanics keep students returning and make progress feel real. Apply them when building any student-facing feature. Never use manipulative patterns (variable rewards, loss aversion, social pressure) — this is a school context with minors.
 
-### Streaks (habit formation)
+### Streaks — built
 Daily reading habit is the goal. Show a streak counter for consecutive school days (Mon–Fri) with at least one session. Weekends don't break the streak. A missed school day does. Streak shows even before today's session is done (it's "at risk", not broken). Never punish a broken streak — just reset to 0 and let the student rebuild. Implementation: `src/lib/streak.js` → `computeStreak(sessions, today)`.
 
-### Personal Best (competence + progress)
+### Personal Best — built
 After every scored attempt, compare against all previous attempts on the same item. Show "New personal best!" with the specific improvement (accuracy %, WPM). If not a new best, show the current best quietly so the student knows what to aim for. Track accuracy and WPM independently — either improving is worth celebrating. Never show a score in isolation without context of where the student has been.
 
-### Milestones (completion momentum)
+### Milestones — not yet built
 Mark real learning events, not arbitrary game points. Good milestones: first 80%+ accuracy, 5-passage streak, improved accuracy week-over-week, first comprehension quiz completed. Bad milestones: "logged in 3 days in a row", "earned 100 XP". Each milestone must correspond to a genuine learning achievement.
 
-### Weekly summary (habit anchor)
+### Weekly summary — not yet built
 Show a brief summary on the first login of a new week: passages read, accuracy trend, streak status. One screen, no navigation required. Drives return visits by making the week's work visible.
 
 ### What to avoid
@@ -190,7 +190,7 @@ After a reading session, if the passage has questions attached:
 
 ### Known production quirks
 - **Edge function must be deployed with `--no-verify-jwt`** — Supabase's new `sb_publishable_...` key format is not a JWT, so the runtime rejects requests otherwise.
-- **On Windows, `KEY=value command` syntax doesn't work** — use `set KEY=value` then the command on a separate line.
+- **On Windows CMD, `KEY=value command` syntax doesn't work** — use `set KEY=value` then the command on a separate line. In bash (Git Bash / WSL) the inline syntax works fine.
 - **Creating teacher accounts manually:** Supabase Auth dashboard doesn't set `raw_user_meta_data` at creation time, so the trigger inserts with default role `student`. Always follow up with a manual SQL insert into `profiles` for the correct role/name.
 - **Email confirmation:** If Supabase Auth email confirmation is enabled, students see a "check your email" screen after signup. For school use, consider disabling it (Auth → Settings → disable email confirmations).
 - **Storage RLS:** `storage.objects` has a policy `students can upload audio` allowing authenticated users to upload to their own folder (`{uid}/...`). Service role in the edge function bypasses this for downloads.
@@ -204,6 +204,20 @@ Frontend (`.env.local`):
 Edge function secrets (Supabase dashboard → Edge Functions → Secrets):
 - `OPENAI_API_KEY` — used for both Whisper and GPT-4o-mini
 - `SUPABASE_SERVICE_ROLE_KEY` (auto-injected by Supabase runtime)
+
+### Decisions log
+
+Key product and architecture decisions captured here so future sessions don't re-debate them.
+
+| Decision | Chosen | Why |
+|---|---|---|
+| Daily session limit scope | Class-wide (one value in `app_settings`) | Per-student overrides add complexity with little learning benefit; teacher can adjust the global limit |
+| Daily limit enforcement | Server-side in edge function (fetched from DB, not trusted from client) | Client-side only is trivially bypassed; server fetch adds one extra DB read which is acceptable |
+| AI feedback flag | Passed from client, not re-fetched server-side | Not security-critical — a student enabling their own AI feedback is harmless |
+| Day boundary timezone | IST throughout (client and edge function) | All users are in the same school; IST midnight is the natural reset point |
+| Comprehension grading | Server-side RPC; `correct_index` never sent to client | Prevents client-side cheating; once-only enforced in the RPC |
+| Confirmation modal before comprehension submit | Required | Quiz is irreversible; modal prevents accidental submission |
+| Leaderboards | Explicitly excluded | Demotivate the bottom half of the class in a known-peer setting |
 
 ### Adding teacher accounts (manual process)
 ```sql

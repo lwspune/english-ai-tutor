@@ -4,7 +4,9 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/AuthContext'
 import QuestionPanel from '../../components/QuestionPanel'
 
-const EMPTY_FORM = { title: '', content: '', grade_level: '9' }
+const DIFFICULTY_LABELS = { easy: 'Easy', moderate: 'Moderate', hard: 'Hard' }
+
+const EMPTY_FORM = { title: '', content: '', grade_level: '9', difficulty: 'easy' }
 
 export default function PassageManager() {
   const { profile } = useAuth()
@@ -44,6 +46,7 @@ export default function PassageManager() {
       title: form.title,
       content: form.content.trim(),
       grade_level: parseInt(form.grade_level),
+      difficulty: form.difficulty,
       word_count: wordCount,
       created_by: profile.id,
     })
@@ -140,15 +143,30 @@ export default function PassageManager() {
               />
               <p className="text-xs text-gray-400 mt-1">{form.content.trim() ? form.content.trim().split(/\s+/).length : 0} words</p>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Grade Level</label>
-              <select
-                value={form.grade_level}
-                onChange={e => setForm(f => ({ ...f, grade_level: e.target.value }))}
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {[9, 10, 11, 12].map(g => <option key={g} value={g}>{g}th Grade</option>)}
-              </select>
+            <div className="flex gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Grade Level</label>
+                <select
+                  value={form.grade_level}
+                  onChange={e => setForm(f => ({ ...f, grade_level: e.target.value }))}
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {[9, 10, 11, 12].map(g => <option key={g} value={g}>{g}th Grade</option>)}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="difficulty-select" className="block text-xs font-medium text-gray-600 mb-1">Difficulty</label>
+                <select
+                  id="difficulty-select"
+                  value={form.difficulty}
+                  onChange={e => setForm(f => ({ ...f, difficulty: e.target.value }))}
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {Object.entries(DIFFICULTY_LABELS).map(([val, label]) => (
+                    <option key={val} value={val}>{label}</option>
+                  ))}
+                </select>
+              </div>
             </div>
             <button
               type="submit"
@@ -171,7 +189,7 @@ export default function PassageManager() {
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-gray-800">{p.title}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{p.word_count} words · Grade {p.grade_level}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{p.word_count} words · Grade {p.grade_level} · {DIFFICULTY_LABELS[p.difficulty] ?? 'Easy'}</p>
                     <p className="text-xs text-gray-500 mt-1 line-clamp-2">{p.content}</p>
                   </div>
                   <div className="flex flex-col items-end gap-2 shrink-0">

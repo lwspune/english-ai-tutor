@@ -20,7 +20,7 @@ export default function StudentHome() {
   useEffect(() => {
     async function load() {
       const [{ data: p }, { data: s }, { data: settings }] = await Promise.all([
-        supabase.from('passages').select('*').order('created_at', { ascending: false }),
+        supabase.from('passages').select('*').or(`grade_level.eq.${profile.grade},grade_level.is.null`).order('created_at', { ascending: false }),
         supabase.from('sessions').select('*, passages(title)').eq('student_id', profile.id).order('created_at', { ascending: false }),
         supabase.from('app_settings').select('daily_session_limit').single(),
       ])
@@ -108,7 +108,7 @@ export default function StudentHome() {
                 <div key={p.id} className="bg-white rounded-xl border border-gray-200 px-4 py-3 flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-800">{p.title}</p>
-                    <p className="text-xs text-gray-400">{p.word_count} words · Grade {p.grade_level}</p>
+                    <p className="text-xs text-gray-400">{p.word_count} words · Grade {p.grade_level} · {p.difficulty ?? 'Easy'}</p>
                   </div>
                   <button
                     onClick={() => navigate(`/student/session/${p.id}`)}
@@ -132,7 +132,7 @@ export default function StudentHome() {
                   <div>
                     <p className="text-sm font-medium text-gray-800">{p.title}</p>
                     <p className="text-xs text-gray-500">
-                      Best score: <span className="font-semibold text-amber-700">{p.bestScore}%</span>
+                      {p.difficulty ?? 'Easy'} · Best score: <span className="font-semibold text-amber-700">{p.bestScore}%</span>
                       {' · '}{3 - p.attemptsUsed} attempt{3 - p.attemptsUsed !== 1 ? 's' : ''} left
                     </p>
                   </div>

@@ -151,9 +151,9 @@ After a reading session, if the passage has questions attached:
 - Teacher can reset a student's comprehension attempt via the `reset_comprehension` RPC (button in StudentDetail Comp. column)
 
 ### Student pages
-- `StudentHome` (`/student`) — lists unread passages (read ones are hidden) + last 10 sessions; "My Progress" banner navigates to `/student/progress`
+- `StudentHome` (`/student`) — "Assigned Passages" (never attempted) + "Keep Practising" (amber, below 80% mastery with attempts left) + streak card + last 10 sessions; "My Progress" banner navigates to `/student/progress`
 - `ReadingSession` (`/student/session/:passageId`) — audio recording
-- `SessionReport` (`/student/report/:sessionId`) — word-by-word results + feedback + comprehension CTA
+- `SessionReport` (`/student/report/:sessionId`) — word-by-word results + feedback + personal best banner (accuracy + WPM vs prior attempts on same passage) + comprehension CTA
 - `ComprehensionQuiz` (`/student/comprehension/:sessionId`) — once-only quiz with confirmation modal
 - `StudentProgress` (`/student/progress`) — sparkline trend charts for Accuracy, Pace, Phrasing, Comprehension
 
@@ -164,10 +164,12 @@ After a reading session, if the passage has questions attached:
 - **Student detail** (`/teacher/student/:id`) — summary stats, sparkline performance trends (Accuracy, Pace, Phrasing, Comprehension), recurring difficult words, session progress table with ↑/↓ trend arrows and comprehension Reset button
 - **Question Manager** — inline panel per passage in `PassageManager`; add/delete MCQs (3–5 per passage, DB-enforced by trigger)
 
-### Shared components
+### Shared components / lib
 - `src/components/PerformanceCharts.jsx` — exports `MetricCard` (sparkline card with Latest/Best/Change stats); used in both `StudentProgress` and `StudentDetail`
 - `src/lib/wpmTargets.js` — exports `WPM_TARGETS` constant `{ 9: 140, 10: 150, 11: 160, 12: 170 }`
 - `src/lib/studentStats.js` — exports `computeAvgComprehension(sessions)`
+- `src/lib/passageClassifier.js` — exports `classifyPassages(passages, sessions)` → `{ todo, retry }`; mastery threshold `MASTERY_THRESHOLD = 80`
+- `src/lib/streak.js` — exports `computeStreak(sessions, today)` → number; school days (Mon–Fri) only, IST timezone
 
 ### Auth & routing
 - `AuthContext` holds both the Supabase `user` and app `profile` (from `profiles` table). Always use `profile` for role/grade — never `user.user_metadata` in components.

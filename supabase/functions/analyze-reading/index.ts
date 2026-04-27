@@ -5,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const WPM_TARGETS: Record<number, number> = { 9: 140, 10: 150, 11: 160, 12: 170 }
+const WPM_TARGETS: Record<string | number, number> = { 9: 140, 10: 150, 11: 160, 12: 170, MBA: 180 }
 
 const normalize = (s: string) => s.toLowerCase().replace(/[^a-z]/g, '')
 const endsWithPunctuation = (s: string) => /[.,!?;:]$/.test(s.trim())
@@ -138,7 +138,7 @@ function buildRuleFeedback(
 
 // AI feedback via GPT-4o-mini
 async function buildAiFeedback(
-  grade: number,
+  grade: string | number,
   scoreAccuracy: number,
   scoreWpm: number,
   wpmTarget: number,
@@ -147,7 +147,8 @@ async function buildAiFeedback(
   countSubstitutions: number,
   difficultWords: string[],
 ): Promise<string> {
-  const prompt = `You are an encouraging English reading coach for a Grade ${grade} high school student.
+  const studentLabel = grade === 'MBA' ? 'an MBA student' : `a Grade ${grade} high school student`
+  const prompt = `You are an encouraging English reading coach for ${studentLabel}.
 The student just read a passage aloud. Here are their results:
 - Accuracy: ${scoreAccuracy}% (words read correctly)
 - Pace: ${scoreWpm} WPM (grade target: ${wpmTarget} WPM)
@@ -289,7 +290,7 @@ Deno.serve(async (req) => {
     const scoreAccuracy = Math.round((correct / passageWords.length) * 100)
     const scoreWpm = durationSeconds > 0 ? Math.round((passageWords.length / durationSeconds) * 60) : 0
     const scorePhrasing = computePhrasingScore(passageWords, whisperWords)
-    const wpmTarget = WPM_TARGETS[grade as number] ?? 150
+    const wpmTarget = WPM_TARGETS[grade] ?? 150
 
     const difficultWords = wordResults
       .filter(w => w.status !== 'correct')

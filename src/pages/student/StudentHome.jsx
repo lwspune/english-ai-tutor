@@ -108,7 +108,7 @@ export default function StudentHome() {
                 <div key={p.id} className="bg-white rounded-xl border border-gray-200 px-4 py-3 flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-800">{p.title}</p>
-                    <p className="text-xs text-gray-400">{p.word_count} words · Grade {p.grade_level} · {p.difficulty ?? 'Easy'}</p>
+                    <p className="text-xs text-gray-400">{p.word_count} words · {p.grade_level === 'MBA' ? 'MBA' : `Grade ${p.grade_level}`} · {p.difficulty ?? 'Easy'}</p>
                   </div>
                   <button
                     onClick={() => navigate(`/student/session/${p.id}`)}

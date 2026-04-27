@@ -55,7 +55,7 @@ export default function LoginPage() {
       email: signupEmail,
       password: signupPassword,
       options: {
-        data: { full_name: name.trim(), role: 'student', grade: parseInt(grade) },
+        data: { full_name: name.trim(), role: 'student', grade },
       },
     })
 
@@ -185,6 +185,7 @@ export default function LoginPage() {
                 {[9, 10, 11, 12].map(g => (
                   <option key={g} value={g}>Grade {g}</option>
                 ))}
+                <option value="MBA">MBA</option>
               </select>
             </div>
             <div>

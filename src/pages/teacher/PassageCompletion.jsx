@@ -58,7 +58,7 @@ export default function PassageCompletion() {
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <div>
                     <p className="text-sm font-semibold text-gray-800">{p.title}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Grade {p.grade_level} · {p.difficulty ?? 'Easy'}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{p.grade_level === 'MBA' ? 'MBA' : `Grade ${p.grade_level}`} · {p.difficulty ?? 'Easy'}</p>
                   </div>
                   {allDone ? (
                     <span className="shrink-0 text-xs font-semibold text-green-700 bg-green-50 border border-green-200 px-2.5 py-1 rounded-full">

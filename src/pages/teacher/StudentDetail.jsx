@@ -106,7 +106,7 @@ export default function StudentDetail() {
       <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
         <button onClick={() => navigate('/teacher')} className="text-gray-500 hover:text-gray-800 text-sm">← Back</button>
         <h1 className="text-base font-semibold text-gray-800">{student.full_name}</h1>
-        <span className="text-sm text-gray-400">Grade {student.grade}</span>
+        <span className="text-sm text-gray-400">{student.grade === 'MBA' ? 'MBA' : `Grade ${student.grade}`}</span>
         {wpmTarget && (
           <span className="text-xs text-gray-400 ml-auto">WPM target: {wpmTarget}</span>
         )}

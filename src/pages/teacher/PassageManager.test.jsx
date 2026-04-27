@@ -72,3 +72,39 @@ describe('PassageManager — difficulty', () => {
     expect(select).toHaveValue('easy')
   })
 })
+
+describe('PassageManager — MBA grade level', () => {
+  beforeEach(() => {
+    mockInsert.mockClear()
+    mockNavigate.mockReset()
+  })
+
+  it('shows MBA as a grade level option', async () => {
+    const user = userEvent.setup()
+    render(<PassageManager />)
+
+    await user.click(screen.getByRole('button', { name: /\+ add passage/i }))
+
+    const gradeSelect = screen.getByLabelText(/grade level/i)
+    const options = Array.from(gradeSelect.options).map(o => o.text)
+    expect(options).toContain('MBA')
+  })
+
+  it('saves MBA grade_level as the string "MBA" (not NaN)', async () => {
+    const user = userEvent.setup()
+    render(<PassageManager />)
+
+    await user.click(screen.getByRole('button', { name: /\+ add passage/i }))
+
+    await user.type(screen.getByPlaceholderText(/the gift of the magi/i), 'MBA Passage')
+    await user.type(screen.getByPlaceholderText(/paste passage text/i), 'Some content for MBA students.')
+    await user.selectOptions(screen.getByLabelText(/grade level/i), 'MBA')
+
+    await user.click(screen.getByRole('button', { name: /save passage/i }))
+
+    await waitFor(() => expect(mockInsert).toHaveBeenCalled())
+    expect(mockInsert).toHaveBeenCalledWith(
+      expect.objectContaining({ grade_level: 'MBA' })
+    )
+  })
+})

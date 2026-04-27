@@ -90,7 +90,7 @@ export default function StudentProgress() {
               referenceY={wpmTarget}
               yMin={0}
               yMax={wpmMax}
-              refLabel={`Dashed line — Grade ${profile.grade} target: ${wpmTarget} wpm`}
+              refLabel={`Dashed line — ${profile.grade === 'MBA' ? 'MBA' : `Grade ${profile.grade}`} target: ${wpmTarget} wpm`}
             />
             <MetricCard
               label="Phrasing"

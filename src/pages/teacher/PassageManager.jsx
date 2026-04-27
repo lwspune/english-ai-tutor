@@ -45,7 +45,7 @@ export default function PassageManager() {
     await supabase.from('passages').insert({
       title: form.title,
       content: form.content.trim(),
-      grade_level: parseInt(form.grade_level),
+      grade_level: form.grade_level,
       difficulty: form.difficulty,
       word_count: wordCount,
       created_by: profile.id,
@@ -145,13 +145,15 @@ export default function PassageManager() {
             </div>
             <div className="flex gap-4">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Grade Level</label>
+                <label htmlFor="grade-level-select" className="block text-xs font-medium text-gray-600 mb-1">Grade Level</label>
                 <select
+                  id="grade-level-select"
                   value={form.grade_level}
                   onChange={e => setForm(f => ({ ...f, grade_level: e.target.value }))}
                   className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   {[9, 10, 11, 12].map(g => <option key={g} value={g}>{g}th Grade</option>)}
+                  <option value="MBA">MBA</option>
                 </select>
               </div>
               <div>
@@ -189,7 +191,7 @@ export default function PassageManager() {
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-gray-800">{p.title}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{p.word_count} words · Grade {p.grade_level} · {DIFFICULTY_LABELS[p.difficulty] ?? 'Easy'}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{p.word_count} words · {p.grade_level === 'MBA' ? 'MBA' : `Grade ${p.grade_level}`} · {DIFFICULTY_LABELS[p.difficulty] ?? 'Easy'}</p>
                     <p className="text-xs text-gray-500 mt-1 line-clamp-2">{p.content}</p>
                   </div>
                   <div className="flex flex-col items-end gap-2 shrink-0">

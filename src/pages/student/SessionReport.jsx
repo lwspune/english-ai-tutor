@@ -40,7 +40,7 @@ function ComprehensionResults({ questions, answers }) {
   )
 }
 
-const WPM_TARGETS = { 9: 140, 10: 150, 11: 160, 12: 170 }
+const WPM_TARGETS = { 9: 140, 10: 150, 11: 160, 12: 170, MBA: 180 }
 
 function FeedbackCard({ raw }) {
   let ai = null

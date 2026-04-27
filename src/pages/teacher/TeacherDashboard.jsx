@@ -173,7 +173,7 @@ export default function TeacherDashboard() {
                     className={`cursor-pointer hover:bg-blue-50 transition-colors ${i < students.length - 1 ? 'border-b border-gray-100' : ''}`}
                   >
                     <td className="px-4 py-3 font-medium text-gray-800">{s.full_name}
-                      <span className="ml-2 text-xs text-gray-400">Grade {s.grade}</span>
+                      <span className="ml-2 text-xs text-gray-400">{s.grade === 'MBA' ? 'MBA' : `Grade ${s.grade}`}</span>
                     </td>
                     <td className="px-4 py-3 text-center text-gray-600">{s.sessions}</td>
                     <td className="px-4 py-3 text-center">

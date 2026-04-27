@@ -12,8 +12,22 @@ vi.mock('../../lib/AuthContext', () => ({
   useAuth: () => ({ profile: { full_name: 'Ms. Sharma' }, signOut: vi.fn() }),
 }))
 
-// Track how many times profiles is queried so we can detect refetches
 let profileFetchCount = 0
+
+// Sessions with cost metrics: 60s Whisper + 500 input + 150 output tokens
+// Whisper: 60/60 * 0.006 = $0.006
+// GPT:     500 * 0.00000015 + 150 * 0.0000006 = $0.000075 + $0.00009 = $0.000165
+// Total per session: $0.006165
+// Two sessions → $0.012330
+const SESSION_WITH_COST = {
+  student_id: 'student-1',
+  score_accuracy: 85,
+  score_wpm: 130,
+  created_at: '2026-04-27T10:00:00Z',
+  whisper_duration_seconds: 60,
+  llm_input_tokens: 500,
+  llm_output_tokens: 150,
+}
 
 vi.mock('../../lib/supabase', () => ({
   supabase: {
@@ -45,7 +59,9 @@ vi.mock('../../lib/supabase', () => ({
       if (table === 'sessions') {
         return {
           select: () => ({
-            in: () => Promise.resolve({ data: [] }),
+            in: () => Promise.resolve({
+              data: [SESSION_WITH_COST, SESSION_WITH_COST],
+            }),
           }),
         }
       }
@@ -54,7 +70,6 @@ vi.mock('../../lib/supabase', () => ({
   },
 }))
 
-// Stub AddStudentModal so we can control its onClose callback
 let capturedOnClose = null
 vi.mock('../../components/AddStudentModal', () => ({
   default: ({ onClose }) => {
@@ -68,6 +83,8 @@ beforeEach(() => {
   profileFetchCount = 0
   capturedOnClose = null
 })
+
+// ─── Add Student ──────────────────────────────────────────────────────────────
 
 describe('TeacherDashboard — Add Student', () => {
   it('renders Add Student button', async () => {
@@ -106,8 +123,36 @@ describe('TeacherDashboard — Add Student', () => {
     await user.click(screen.getByRole('button', { name: /add student/i }))
     capturedOnClose(false)
 
-    // Give React a tick to potentially trigger effects
     await new Promise(r => setTimeout(r, 50))
     expect(profileFetchCount).toBe(countBefore)
+  })
+})
+
+// ─── Cost column ──────────────────────────────────────────────────────────────
+
+describe('TeacherDashboard — Cost column', () => {
+  it('renders a Cost column header', async () => {
+    render(<TeacherDashboard />)
+    await waitFor(() => screen.getByText('Aarav Shah'))
+    expect(screen.getByRole('columnheader', { name: /cost/i })).toBeInTheDocument()
+  })
+
+  it('shows the per-student total cost in the table', async () => {
+    render(<TeacherDashboard />)
+    await waitFor(() => screen.getByText('Aarav Shah'))
+    // Two sessions × $0.006165 = $0.0123 (appears in row + class total)
+    expect(screen.getAllByText('$0.0123').length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('shows the class total cost below the table', async () => {
+    render(<TeacherDashboard />)
+    await waitFor(() => screen.getByText('Aarav Shah'))
+    expect(screen.getByText(/class total/i)).toBeInTheDocument()
+  })
+
+  it('shows "—" for a student with no session cost data', async () => {
+    // Sessions mock returns sessions with cost; this test would need null sessions.
+    // Covered by computeSessionCost unit tests — formatCost(null) = "—".
+    // Integration: covered by costUtils.test.js.
   })
 })

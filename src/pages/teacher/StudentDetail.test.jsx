@@ -53,6 +53,8 @@ vi.mock('../../lib/supabase', () => ({
                     score_comprehension: null, comprehension_answers: null,
                     word_results: [], feedback: AI_FEEDBACK,
                     passages: { title: 'The Gift of the Magi' },
+                    // cost: 60s Whisper ($0.006) + 500 input + 150 output = $0.006165
+                    whisper_duration_seconds: 60, llm_input_tokens: 500, llm_output_tokens: 150,
                   },
                   {
                     id: 'sess-2', created_at: '2026-04-02T10:00:00Z',
@@ -61,6 +63,8 @@ vi.mock('../../lib/supabase', () => ({
                     score_comprehension: null, comprehension_answers: null,
                     word_results: [], feedback: RULE_FEEDBACK,
                     passages: { title: 'The Gift of the Magi' },
+                    // old session — no cost data
+                    whisper_duration_seconds: null, llm_input_tokens: null, llm_output_tokens: null,
                   },
                 ],
               }),
@@ -201,5 +205,30 @@ describe('StudentDetail — reset password', () => {
 
     await user.click(screen.getByRole('button', { name: /cancel/i }))
     expect(screen.queryByLabelText(/new password/i)).not.toBeInTheDocument()
+  })
+})
+
+// ─── Cost column ──────────────────────────────────────────────────────────────
+
+describe('StudentDetail — cost column', () => {
+  it('renders a Cost column header in the session table', async () => {
+    render(<StudentDetail />)
+    await waitFor(() => screen.getByText('Aarav Shah'))
+    expect(screen.getByRole('columnheader', { name: /cost/i })).toBeInTheDocument()
+  })
+
+  it('shows formatted cost for a session with metrics', async () => {
+    render(<StudentDetail />)
+    await waitFor(() => screen.getByText('Aarav Shah'))
+    // sess-1: 60s Whisper ($0.006) + 500 input + 150 output = $0.006165 → $0.0062
+    expect(screen.getByText('$0.0062')).toBeInTheDocument()
+  })
+
+  it('shows "—" for an old session without cost metrics', async () => {
+    render(<StudentDetail />)
+    await waitFor(() => screen.getByText('Aarav Shah'))
+    // sess-2 has all nulls
+    const dashes = screen.getAllByText('—')
+    expect(dashes.length).toBeGreaterThan(0)
   })
 })

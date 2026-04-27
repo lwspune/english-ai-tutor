@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { computeAvgComprehension } from '../../lib/studentStats'
 import { MetricCard } from '../../components/PerformanceCharts'
 import { WPM_TARGETS } from '../../lib/wpmTargets'
+import { computeSessionCost, formatCost } from '../../lib/costUtils'
 
 function trend(current, previous) {
   if (previous == null) return null
@@ -342,6 +343,7 @@ export default function StudentDetail() {
                     <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Skipped</th>
                     <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Subs</th>
                     <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Comp.</th>
+                    <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Cost</th>
                     <th className="px-3 py-3"></th>
                   </tr>
                 </thead>
@@ -412,6 +414,9 @@ export default function StudentDetail() {
                         ) : (
                           <td className="px-3 py-3 text-center text-gray-300 text-xs">—</td>
                         )}
+                        <td className="px-3 py-3 text-center text-xs font-mono text-gray-500">
+                          {formatCost(computeSessionCost(s))}
+                        </td>
                         <td className="px-3 py-3 text-center">
                           {s.feedback && (
                             <button
@@ -426,7 +431,7 @@ export default function StudentDetail() {
                       </tr>
                       {openFeedbackId === s.id && (
                         <tr className="bg-blue-50">
-                          <td colSpan={10} className="px-4 py-3">
+                          <td colSpan={11} className="px-4 py-3">
                             <FeedbackPanel raw={s.feedback} />
                           </td>
                         </tr>

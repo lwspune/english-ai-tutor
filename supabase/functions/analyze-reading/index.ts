@@ -146,7 +146,7 @@ async function buildAiFeedback(
   countOmissions: number,
   countSubstitutions: number,
   difficultWords: string[],
-): Promise<string> {
+): Promise<{ content: string; inputTokens: number | null; outputTokens: number | null }> {
   const studentLabel = grade === 'MBA' ? 'an MBA student' : `a Grade ${grade} high school student`
   const prompt = `You are an encouraging English reading coach for ${studentLabel}.
 The student just read a passage aloud. Here are their results:
@@ -181,11 +181,15 @@ Respond ONLY with a JSON object using exactly these keys:
   if (!res.ok) {
     const err = await res.text()
     console.error('GPT feedback error:', err)
-    return ''
+    return { content: '', inputTokens: null, outputTokens: null }
   }
 
   const data = await res.json()
-  return data.choices?.[0]?.message?.content ?? ''
+  return {
+    content: data.choices?.[0]?.message?.content ?? '',
+    inputTokens: data.usage?.prompt_tokens ?? null,
+    outputTokens: data.usage?.completion_tokens ?? null,
+  }
 }
 
 Deno.serve(async (req) => {
@@ -303,12 +307,18 @@ Deno.serve(async (req) => {
 
     // Generate feedback
     let feedback = ''
+    let llmInputTokens: number | null = null
+    let llmOutputTokens: number | null = null
+
     if (aiFeedbackEnabled && enoughTranscript) {
-      feedback = await buildAiFeedback(
+      const result = await buildAiFeedback(
         grade ?? 10,
         scoreAccuracy, scoreWpm, wpmTarget, scorePhrasing,
         countOmissions, countSubstitutions, difficultWords,
       )
+      feedback = result.content
+      llmInputTokens = result.inputTokens
+      llmOutputTokens = result.outputTokens
     }
     // Fall back to rule-based if AI is off or GPT call failed
     if (!feedback) {
@@ -332,6 +342,9 @@ Deno.serve(async (req) => {
         count_substitutions: countSubstitutions,
         word_results: wordResults,
         feedback,
+        whisper_duration_seconds: durationSeconds,
+        llm_input_tokens: llmInputTokens,
+        llm_output_tokens: llmOutputTokens,
       })
       .select()
       .single()

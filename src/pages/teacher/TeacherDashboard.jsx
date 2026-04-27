@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/AuthContext'
 import AddStudentModal from '../../components/AddStudentModal'
+import { computeSessionCost, formatCost } from '../../lib/costUtils'
 
 export default function TeacherDashboard() {
   const { profile, signOut } = useAuth()
@@ -71,17 +72,21 @@ export default function TeacherDashboard() {
 
       const { data: sessionStats } = await supabase
         .from('sessions')
-        .select('student_id, score_accuracy, score_wpm, created_at')
+        .select('student_id, score_accuracy, score_wpm, created_at, whisper_duration_seconds, llm_input_tokens, llm_output_tokens')
         .in('student_id', studentProfiles.map(s => s.id))
 
       const statsMap = {}
       for (const s of sessionStats ?? []) {
-        if (!statsMap[s.student_id]) statsMap[s.student_id] = { sessions: 0, totalAccuracy: 0, totalWpm: 0, lastSession: null }
+        if (!statsMap[s.student_id]) statsMap[s.student_id] = { sessions: 0, totalAccuracy: 0, totalWpm: 0, lastSession: null, totalCost: null }
         statsMap[s.student_id].sessions++
         statsMap[s.student_id].totalAccuracy += s.score_accuracy
         statsMap[s.student_id].totalWpm += s.score_wpm
         if (!statsMap[s.student_id].lastSession || s.created_at > statsMap[s.student_id].lastSession) {
           statsMap[s.student_id].lastSession = s.created_at
+        }
+        const sessionCost = computeSessionCost(s)
+        if (sessionCost !== null) {
+          statsMap[s.student_id].totalCost = (statsMap[s.student_id].totalCost ?? 0) + sessionCost
         }
       }
 
@@ -91,6 +96,7 @@ export default function TeacherDashboard() {
         avgAccuracy: statsMap[s.id] ? Math.round(statsMap[s.id].totalAccuracy / statsMap[s.id].sessions) : null,
         avgWpm: statsMap[s.id] ? Math.round(statsMap[s.id].totalWpm / statsMap[s.id].sessions) : null,
         lastSession: statsMap[s.id]?.lastSession ?? null,
+        totalCost: statsMap[s.id]?.totalCost ?? null,
       })))
       setLoading(false)
     }
@@ -173,46 +179,61 @@ export default function TeacherDashboard() {
           <p className="text-sm text-gray-400">Loading...</p>
         ) : students.length === 0 ? (
           <p className="text-sm text-gray-400">No students found.</p>
-        ) : (
-          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50">
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Student</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Sessions</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Avg Accuracy</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Avg WPM</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Last Session</th>
-                </tr>
-              </thead>
-              <tbody>
-                {students.map((s, i) => (
-                  <tr
-                    key={s.id}
-                    onClick={() => navigate(`/teacher/student/${s.id}`)}
-                    className={`cursor-pointer hover:bg-blue-50 transition-colors ${i < students.length - 1 ? 'border-b border-gray-100' : ''}`}
-                  >
-                    <td className="px-4 py-3 font-medium text-gray-800">{s.full_name}
-                      <span className="ml-2 text-xs text-gray-400">{s.grade === 'MBA' ? 'MBA' : `Grade ${s.grade}`}</span>
-                    </td>
-                    <td className="px-4 py-3 text-center text-gray-600">{s.sessions}</td>
-                    <td className="px-4 py-3 text-center">
-                      {s.avgAccuracy !== null ? (
-                        <span className={`font-semibold ${s.avgAccuracy >= 80 ? 'text-green-600' : s.avgAccuracy >= 60 ? 'text-yellow-600' : 'text-red-500'}`}>
-                          {s.avgAccuracy}%
-                        </span>
-                      ) : <span className="text-gray-300">—</span>}
-                    </td>
-                    <td className="px-4 py-3 text-center text-gray-600">{s.avgWpm ?? <span className="text-gray-300">—</span>}</td>
-                    <td className="px-4 py-3 text-center text-gray-400 text-xs">
-                      {s.lastSession ? new Date(s.lastSession).toLocaleDateString() : '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        ) : (() => {
+          const classTotal = students.reduce((sum, s) => s.totalCost !== null ? sum + s.totalCost : sum, 0)
+          const hasAnyCost = students.some(s => s.totalCost !== null)
+          return (
+            <>
+              <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50">
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Student</th>
+                      <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Sessions</th>
+                      <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Avg Accuracy</th>
+                      <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Avg WPM</th>
+                      <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Last Session</th>
+                      <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Cost</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {students.map((s, i) => (
+                      <tr
+                        key={s.id}
+                        onClick={() => navigate(`/teacher/student/${s.id}`)}
+                        className={`cursor-pointer hover:bg-blue-50 transition-colors ${i < students.length - 1 ? 'border-b border-gray-100' : ''}`}
+                      >
+                        <td className="px-4 py-3 font-medium text-gray-800">{s.full_name}
+                          <span className="ml-2 text-xs text-gray-400">{s.grade === 'MBA' ? 'MBA' : `Grade ${s.grade}`}</span>
+                        </td>
+                        <td className="px-4 py-3 text-center text-gray-600">{s.sessions}</td>
+                        <td className="px-4 py-3 text-center">
+                          {s.avgAccuracy !== null ? (
+                            <span className={`font-semibold ${s.avgAccuracy >= 80 ? 'text-green-600' : s.avgAccuracy >= 60 ? 'text-yellow-600' : 'text-red-500'}`}>
+                              {s.avgAccuracy}%
+                            </span>
+                          ) : <span className="text-gray-300">—</span>}
+                        </td>
+                        <td className="px-4 py-3 text-center text-gray-600">{s.avgWpm ?? <span className="text-gray-300">—</span>}</td>
+                        <td className="px-4 py-3 text-center text-gray-400 text-xs">
+                          {s.lastSession ? new Date(s.lastSession).toLocaleDateString() : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-center text-xs font-mono text-gray-600">
+                          {formatCost(s.totalCost)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {hasAnyCost && (
+                <p className="text-xs text-gray-500 text-right mt-2">
+                  Class total: <span className="font-semibold font-mono text-gray-700">{formatCost(classTotal)}</span>
+                </p>
+              )}
+            </>
+          )
+        })()}
       </main>
     </div>
   )

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { computeAvgComprehension } from '../../lib/studentStats'
@@ -45,11 +45,34 @@ function computeDifficultWords(sessions) {
     .map(([word]) => word)
 }
 
+function FeedbackPanel({ raw }) {
+  let ai = null
+  try { ai = JSON.parse(raw) } catch { /* plain text */ }
+
+  if (ai?.wentWell) {
+    return (
+      <div className="space-y-2 text-sm">
+        <p><span className="font-semibold text-green-700">What went well: </span>{ai.wentWell}</p>
+        <p><span className="font-semibold text-amber-700">Focus on: </span>{ai.focusOn}</p>
+        <p><span className="font-semibold text-blue-700">Tip: </span>{ai.tip}</p>
+        {ai.practiseWords?.length > 0 && (
+          <p>
+            <span className="font-semibold text-red-700">Words to practise: </span>
+            {ai.practiseWords.join(', ')}
+          </p>
+        )}
+      </div>
+    )
+  }
+  return <p className="text-sm text-gray-700">{raw}</p>
+}
+
 export default function StudentDetail() {
   const { studentId } = useParams()
   const navigate = useNavigate()
   const [student, setStudent] = useState(null)
   const [sessions, setSessions] = useState([])
+  const [openFeedbackId, setOpenFeedbackId] = useState(null)
 
   useEffect(() => {
     async function load() {
@@ -212,6 +235,7 @@ export default function StudentDetail() {
                     <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Skipped</th>
                     <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Subs</th>
                     <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Comp.</th>
+                    <th className="px-3 py-3"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -224,7 +248,8 @@ export default function StudentDetail() {
                       : s.score_wpm < wpmTarget ? 'text-yellow-600' : 'text-blue-600'
 
                     return (
-                      <tr key={s.id} className={i < sessions.length - 1 ? 'border-b border-gray-100' : ''}>
+                      <React.Fragment key={s.id}>
+                      <tr className={i < sessions.length - 1 ? 'border-b border-gray-100' : ''}>
                         <td className="px-3 py-3 text-gray-400 text-xs">{i + 1}</td>
                         <td className="px-3 py-3 text-gray-800 max-w-[120px] truncate">{s.passages?.title}</td>
                         <td className="px-3 py-3 text-gray-500 text-xs whitespace-nowrap">
@@ -280,7 +305,26 @@ export default function StudentDetail() {
                         ) : (
                           <td className="px-3 py-3 text-center text-gray-300 text-xs">—</td>
                         )}
+                        <td className="px-3 py-3 text-center">
+                          {s.feedback && (
+                            <button
+                              onClick={() => setOpenFeedbackId(openFeedbackId === s.id ? null : s.id)}
+                              className="text-xs text-blue-500 hover:text-blue-700 focus-visible:underline focus-visible:outline-none whitespace-nowrap"
+                              aria-label={`${openFeedbackId === s.id ? 'Hide' : 'Show'} feedback for session ${i + 1}`}
+                            >
+                              {openFeedbackId === s.id ? 'Hide' : 'Feedback'}
+                            </button>
+                          )}
+                        </td>
                       </tr>
+                      {openFeedbackId === s.id && (
+                        <tr className="bg-blue-50">
+                          <td colSpan={10} className="px-4 py-3">
+                            <FeedbackPanel raw={s.feedback} />
+                          </td>
+                        </tr>
+                      )}
+                      </React.Fragment>
                     )
                   })}
                 </tbody>

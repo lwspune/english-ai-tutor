@@ -67,12 +67,92 @@ function FeedbackPanel({ raw }) {
   return <p className="text-sm text-gray-700">{raw}</p>
 }
 
+function ResetPasswordModal({ studentId, onClose }) {
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setError('')
+    setSubmitting(true)
+    const { data, error: fnError } = await supabase.functions.invoke('reset-student-password', {
+      body: { student_id: studentId, new_password: password },
+    })
+    setSubmitting(false)
+    if (fnError || !data?.success) {
+      setError(fnError?.message ?? data?.error ?? 'Reset failed')
+      return
+    }
+    onClose(true)
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+        <h2 className="text-base font-semibold text-gray-800 mb-4">Reset Password</h2>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="reset-password" className="block text-sm font-medium text-gray-700 mb-1">
+              New Password
+            </label>
+            <div className="relative">
+              <input
+                id="reset-password"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+                minLength={8}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm pr-16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                placeholder="Min 8 characters"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(v => !v)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500 hover:text-gray-700 focus-visible:outline-none focus-visible:underline"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? 'Hide' : 'Show'}
+              </button>
+            </div>
+          </div>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => onClose(false)}
+              className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 focus-visible:outline-none focus-visible:underline"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            >
+              {submitting ? 'Saving…' : 'Confirm'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 export default function StudentDetail() {
   const { studentId } = useParams()
   const navigate = useNavigate()
   const [student, setStudent] = useState(null)
   const [sessions, setSessions] = useState([])
   const [openFeedbackId, setOpenFeedbackId] = useState(null)
+  const [showResetPassword, setShowResetPassword] = useState(false)
+  const [passwordResetSuccess, setPasswordResetSuccess] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -126,14 +206,41 @@ export default function StudentDetail() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
+      {showResetPassword && (
+        <ResetPasswordModal
+          studentId={studentId}
+          onClose={(success) => {
+            setShowResetPassword(false)
+            if (success) setPasswordResetSuccess(true)
+          }}
+        />
+      )}
+
+      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 flex-wrap">
         <button onClick={() => navigate('/teacher')} className="text-gray-500 hover:text-gray-800 text-sm">← Back</button>
         <h1 className="text-base font-semibold text-gray-800">{student.full_name}</h1>
         <span className="text-sm text-gray-400">{student.grade === 'MBA' ? 'MBA' : `Grade ${student.grade}`}</span>
-        {wpmTarget && (
-          <span className="text-xs text-gray-400 ml-auto">WPM target: {wpmTarget}</span>
-        )}
+        <div className="ml-auto flex items-center gap-3 flex-wrap">
+          {wpmTarget && (
+            <span className="text-xs text-gray-400">WPM target: {wpmTarget}</span>
+          )}
+          <button
+            onClick={() => { setShowResetPassword(true); setPasswordResetSuccess(false) }}
+            className="text-sm text-gray-500 hover:text-gray-800 border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            aria-label="Reset password"
+          >
+            Reset Password
+          </button>
+        </div>
       </header>
+
+      {passwordResetSuccess && (
+        <div className="max-w-3xl mx-auto px-4 pt-4">
+          <div className="rounded-lg bg-green-50 px-4 py-3 text-sm text-green-800 font-medium">
+            Password updated successfully.
+          </div>
+        </div>
+      )}
 
       <main className="max-w-3xl mx-auto px-4 py-6 space-y-6">
 

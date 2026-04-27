@@ -95,7 +95,7 @@ npx supabase functions deploy analyze-reading --no-verify-jwt
 
 ## Architecture
 
-English reading-aloud evaluation app for high school students (grades 9–12) with a teacher dashboard. Designed to be teacher-independent — AI provides per-session feedback so the teacher acts as facilitator.
+English reading-aloud evaluation app for students (grades 9–12 and MBA) with a teacher dashboard. Designed to be teacher-independent — AI provides per-session feedback so the teacher acts as facilitator.
 
 **Stack:** React 19 + Vite + Tailwind v4, Supabase (auth, PostgreSQL, storage, edge functions), OpenAI Whisper API + GPT-4o-mini.  
 **Deployed:** Frontend on Vercel, edge function on Supabase (ap-south-1), repo: github.com/lwspune/english-ai-tutor.
@@ -118,7 +118,7 @@ English reading-aloud evaluation app for high school students (grades 9–12) wi
 
 ### Metrics
 - **Accuracy** — % of passage words read correctly (via sequence alignment)
-- **Pace (WPM)** — words per minute vs grade-level target (grade 9→140, 10→150, 11→160, 12→170)
+- **Pace (WPM)** — words per minute vs grade-level target (grade 9→140, 10→150, 11→160, 12→170, MBA→180)
 - **Phrasing** — % of notable pauses (>0.4s) that fall at punctuation boundaries (from Whisper timestamps)
 - **Omissions** — passage words skipped entirely
 - **Substitutions** — wrong word said in place of a passage word
@@ -155,12 +155,12 @@ After a reading session, if the passage has questions attached:
 - **Daily limit stepper** — −/N/+ control in header (clamped 1–20); updates `app_settings.daily_session_limit` immediately
 - **Class code display** — shown in header with one-tap copy; students use this code to self-register
 - **Passage Completion** (`/teacher/completion`) — per-passage cards showing count completed + chips for students who haven't read yet; chips link to student detail
-- **Student detail** (`/teacher/student/:id`) — summary stats, sparkline performance trends (Accuracy, Pace, Phrasing, Comprehension), recurring difficult words, session progress table with ↑/↓ trend arrows and comprehension Reset button
+- **Student detail** (`/teacher/student/:id`) — summary stats, sparkline performance trends (Accuracy, Pace, Phrasing, Comprehension), recurring difficult words, session progress table with ↑/↓ trend arrows, comprehension Reset button, and expandable per-session AI feedback panel (click "Feedback" to toggle)
 - **Question Manager** — inline panel per passage in `PassageManager`; add/delete MCQs (3–5 per passage, DB-enforced by trigger)
 
 ### Shared components / lib
 - `src/components/PerformanceCharts.jsx` — exports `MetricCard` (sparkline card with Latest/Best/Change stats); used in both `StudentProgress` and `StudentDetail`
-- `src/lib/wpmTargets.js` — exports `WPM_TARGETS` constant `{ 9: 140, 10: 150, 11: 160, 12: 170 }`
+- `src/lib/wpmTargets.js` — exports `WPM_TARGETS` constant `{ 9: 140, 10: 150, 11: 160, 12: 170, MBA: 180 }`
 - `src/lib/studentStats.js` — exports `computeAvgComprehension(sessions)`
 - `src/lib/passageClassifier.js` — exports `classifyPassages(passages, sessions)` → `{ todo, retry }`; mastery threshold `MASTERY_THRESHOLD = 80`
 - `src/lib/streak.js` — exports `computeStreak(sessions, today)` → number; school days (Mon–Fri) only, IST timezone
@@ -173,8 +173,8 @@ After a reading session, if the passage has questions attached:
 - `onAuthStateChange` intentionally ignores `TOKEN_REFRESHED` and `INITIAL_SESSION` events — acting on them sets `loading=true` and causes a full page remount when the user switches back to the tab.
 
 ### Database schema (key points)
-- `profiles` — `role` is `teacher` or `student`; `grade` 9–12 (null for teachers)
-- `passages` — `word_count` computed client-side on insert in `PassageManager`
+- `profiles` — `role` is `teacher` or `student`; `grade` is `text` (`'9'`–`'12'` or `'MBA'`, null for teachers); migration 009 changed this from `int`
+- `passages` — `word_count` computed client-side on insert in `PassageManager`; `grade_level` is `text` (`'9'`–`'12'` or `'MBA'`, nullable for all-grades passages); migration 009 changed this from `int`
 - `sessions` — `word_results` JSONB `[{ word, spoken, status }]`, status ∈ `correct | substitution | omission`; also stores `score_accuracy`, `score_wpm`, `score_phrasing`, `score_fluency` (same as phrasing, kept for compat), `count_omissions`, `count_substitutions`, `feedback` (JSON string or plain text), `score_comprehension` (int nullable), `comprehension_answers` (jsonb nullable — `[{ question_id, selected_index, is_correct }]`)
 - `questions` — `passage_id` FK, `question_text`, `options` (jsonb array of 4 strings), `correct_index` (0–3), `display_order`; max 5 per passage enforced by DB trigger `enforce_question_limit`
 - `app_settings` — single-row table (`id boolean PK default true`), holds `ai_feedback_enabled boolean`, `class_code text` (random 6-char code set on migration; teacher shares with students for self-registration), `daily_session_limit int` (default 5; teacher adjusts via dashboard stepper, clamped 1–20)
@@ -195,6 +195,7 @@ After a reading session, if the passage has questions attached:
 - **Email confirmation:** If Supabase Auth email confirmation is enabled, students see a "check your email" screen after signup. For school use, consider disabling it (Auth → Settings → disable email confirmations).
 - **Storage RLS:** `storage.objects` has a policy `students can upload audio` allowing authenticated users to upload to their own folder (`{uid}/...`). Service role in the edge function bypasses this for downloads.
 - **Class code:** Set once by migration (random 6-char hex). To change it: `update app_settings set class_code = 'NEWCODE' where id = true;`
+- **Creating student accounts manually (bulk/admin):** Insert directly into `auth.users` with `crypt(password, gen_salt('bf'))` and `raw_user_meta_data: { full_name, role: 'student', grade }`. The `handle_new_user` trigger fires automatically and creates the profile. Do NOT use the Supabase dashboard UI for this — it doesn't set `raw_user_meta_data`.
 
 ### Environment variables
 Frontend (`.env.local`):
@@ -218,6 +219,11 @@ Key product and architecture decisions captured here so future sessions don't re
 | Comprehension grading | Server-side RPC; `correct_index` never sent to client | Prevents client-side cheating; once-only enforced in the RPC |
 | Confirmation modal before comprehension submit | Required | Quiz is irreversible; modal prevents accidental submission |
 | Leaderboards | Explicitly excluded | Demotivate the bottom half of the class in a known-peer setting |
+| MBA as a grade level | `grade`/`grade_level` stored as `text` (not int) | Allows non-numeric grade labels; migration 009 cast existing int values to text |
+| Creating student accounts manually | Insert directly into `auth.users` via SQL (not via dashboard) | Supabase dashboard doesn't set `raw_user_meta_data` at creation time; direct SQL insert lets the `handle_new_user` trigger fire correctly with grade and role |
+| Teacher adds students from dashboard | `create-student` edge function (service role); teacher-set password; `email_confirm: true` | Service role key cannot be in the browser; teacher-set password is simpler than invite email for a school context where teachers distribute credentials |
+| CSV bulk import | Client-side parse (native FileReader + split); validation preview before import; same edge function as single-add (array payload) | No library needed for simple CSV; previewing errors before import prevents surprises |
+| Teacher resets student password | `reset-student-password` edge function; guards against resetting non-student accounts | Requires service role; guard prevents a teacher accidentally resetting another teacher's password |
 
 ### Adding teacher accounts (manual process)
 ```sql

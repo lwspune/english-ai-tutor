@@ -4,6 +4,8 @@ import userEvent from '@testing-library/user-event'
 import StudentDetail from './StudentDetail'
 
 const mockNavigate = vi.fn()
+const mockInvoke = vi.fn()
+
 vi.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
   useParams: () => ({ studentId: 'student-1' }),
@@ -70,12 +72,20 @@ vi.mock('../../lib/supabase', () => ({
       return {}
     },
     rpc: () => Promise.resolve({}),
+    functions: {
+      invoke: (...args) => mockInvoke(...args),
+    },
   },
 }))
 
-describe('StudentDetail — feedback panel', () => {
-  beforeEach(() => mockNavigate.mockReset())
+beforeEach(() => {
+  mockNavigate.mockReset()
+  mockInvoke.mockReset()
+})
 
+// ─── Feedback panel ───────────────────────────────────────────────────────────
+
+describe('StudentDetail — feedback panel', () => {
   it('shows a Feedback button for each session', async () => {
     render(<StudentDetail />)
     await waitFor(() => screen.getAllByText('The Gift of the Magi'))
@@ -118,5 +128,78 @@ describe('StudentDetail — feedback panel', () => {
 
     await user.click(firstBtn)
     expect(screen.queryByText('Great accuracy on most words.')).not.toBeInTheDocument()
+  })
+})
+
+// ─── Reset Password ───────────────────────────────────────────────────────────
+
+describe('StudentDetail — reset password', () => {
+  async function waitForLoad() {
+    render(<StudentDetail />)
+    await waitFor(() => screen.getByText('Aarav Shah'))
+  }
+
+  it('shows a Reset Password button in the header', async () => {
+    await waitForLoad()
+    expect(screen.getByRole('button', { name: /reset password/i })).toBeInTheDocument()
+  })
+
+  it('opens a password modal when Reset Password is clicked', async () => {
+    const user = userEvent.setup()
+    await waitForLoad()
+
+    await user.click(screen.getByRole('button', { name: /reset password/i }))
+    expect(screen.getByLabelText(/new password/i)).toBeInTheDocument()
+  })
+
+  it('calls reset-student-password edge function with correct payload', async () => {
+    mockInvoke.mockResolvedValue({ data: { success: true }, error: null })
+    const user = userEvent.setup()
+    await waitForLoad()
+
+    await user.click(screen.getByRole('button', { name: /reset password/i }))
+    await user.type(screen.getByLabelText(/new password/i), 'newpassword1')
+    await user.click(screen.getByRole('button', { name: /^confirm/i }))
+
+    await waitFor(() =>
+      expect(mockInvoke).toHaveBeenCalledWith('reset-student-password', {
+        body: { student_id: 'student-1', new_password: 'newpassword1' },
+      })
+    )
+  })
+
+  it('shows success banner after password reset', async () => {
+    mockInvoke.mockResolvedValue({ data: { success: true }, error: null })
+    const user = userEvent.setup()
+    await waitForLoad()
+
+    await user.click(screen.getByRole('button', { name: /reset password/i }))
+    await user.type(screen.getByLabelText(/new password/i), 'newpassword1')
+    await user.click(screen.getByRole('button', { name: /^confirm/i }))
+
+    await waitFor(() => expect(screen.getByText(/password updated/i)).toBeInTheDocument())
+  })
+
+  it('shows error message when reset fails', async () => {
+    mockInvoke.mockResolvedValue({ data: null, error: { message: 'Student not found' } })
+    const user = userEvent.setup()
+    await waitForLoad()
+
+    await user.click(screen.getByRole('button', { name: /reset password/i }))
+    await user.type(screen.getByLabelText(/new password/i), 'newpassword1')
+    await user.click(screen.getByRole('button', { name: /^confirm/i }))
+
+    await waitFor(() => expect(screen.getByText(/student not found/i)).toBeInTheDocument())
+  })
+
+  it('closes the modal when Cancel is clicked', async () => {
+    const user = userEvent.setup()
+    await waitForLoad()
+
+    await user.click(screen.getByRole('button', { name: /reset password/i }))
+    expect(screen.getByLabelText(/new password/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /cancel/i }))
+    expect(screen.queryByLabelText(/new password/i)).not.toBeInTheDocument()
   })
 })

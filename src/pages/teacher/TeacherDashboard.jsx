@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/AuthContext'
+import AddStudentModal from '../../components/AddStudentModal'
 
 export default function TeacherDashboard() {
   const { profile, signOut } = useAuth()
@@ -14,6 +15,8 @@ export default function TeacherDashboard() {
   const [codeCopied, setCodeCopied] = useState(false)
   const [dailyLimit, setDailyLimit] = useState(null)
   const [updatingLimit, setUpdatingLimit] = useState(false)
+  const [showAddStudent, setShowAddStudent] = useState(false)
+  const [studentFetchTrigger, setStudentFetchTrigger] = useState(0)
 
   function copyCode() {
     navigator.clipboard.writeText(classCode)
@@ -56,7 +59,8 @@ export default function TeacherDashboard() {
   }, [])
 
   useEffect(() => {
-    async function load() {
+    async function loadStudents() {
+      setLoading(true)
       const { data: studentProfiles } = await supabase
         .from('profiles')
         .select('id, full_name, grade')
@@ -90,8 +94,13 @@ export default function TeacherDashboard() {
       })))
       setLoading(false)
     }
-    load()
-  }, [])
+    loadStudents()
+  }, [studentFetchTrigger])
+
+  function handleModalClose(didAdd) {
+    setShowAddStudent(false)
+    if (didAdd) setStudentFetchTrigger(t => t + 1)
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -146,8 +155,19 @@ export default function TeacherDashboard() {
         </div>
       </header>
 
+      {showAddStudent && <AddStudentModal onClose={handleModalClose} />}
+
       <main className="max-w-4xl mx-auto px-4 py-6">
-        <h2 className="text-base font-semibold text-gray-700 mb-4">Class Performance</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-semibold text-gray-700">Class Performance</h2>
+          <button
+            onClick={() => setShowAddStudent(true)}
+            className="flex items-center gap-1.5 text-sm font-medium bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            aria-label="Add student"
+          >
+            + Add Student
+          </button>
+        </div>
 
         {loading ? (
           <p className="text-sm text-gray-400">Loading...</p>

@@ -4,6 +4,8 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/AuthContext'
 import { classifyPassages } from '../../lib/passageClassifier'
 import { computeStreak } from '../../lib/streak'
+import { shouldShowWeeklySummary, markWeeklySummaryShown, computeWeeklySummaryData } from '../../lib/weeklySummary'
+import WeeklySummaryModal from '../../components/WeeklySummaryModal'
 
 export default function StudentHome() {
   const { profile, signOut } = useAuth()
@@ -16,6 +18,7 @@ export default function StudentHome() {
   const [todayCount, setTodayCount] = useState(0)
   const [dailyLimit, setDailyLimit] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [weeklySummary, setWeeklySummary] = useState(null)
 
   useEffect(() => {
     async function load() {
@@ -30,20 +33,32 @@ export default function StudentHome() {
       const countToday = allSessions.filter(
         s => new Date(s.created_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }) === todayStr
       ).length
+      const currentStreak = computeStreak(allSessions)
       setTodo(todo)
       setRetry(retry)
-      setStreak(computeStreak(allSessions))
+      setStreak(currentStreak)
       setHasReadToday(countToday > 0)
       setTodayCount(countToday)
       setDailyLimit(settings?.daily_session_limit ?? 5)
       setSessions(allSessions.slice(0, 10))
       setLoading(false)
+      if (allSessions.length > 0 && shouldShowWeeklySummary(profile.id)) {
+        setWeeklySummary(computeWeeklySummaryData(allSessions))
+      }
     }
     load()
   }, [profile.id])
 
+  function dismissWeeklySummary() {
+    markWeeklySummaryShown(profile.id)
+    setWeeklySummary(null)
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
+      {weeklySummary && (
+        <WeeklySummaryModal data={weeklySummary} streak={streak} onDismiss={dismissWeeklySummary} />
+      )}
       <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
         <h1 className="text-lg font-semibold text-gray-800">English AI Tutor</h1>
         <div className="flex items-center gap-3">

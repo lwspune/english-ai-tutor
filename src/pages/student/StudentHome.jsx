@@ -7,6 +7,40 @@ import { computeStreak } from '../../lib/streak'
 import { shouldShowWeeklySummary, markWeeklySummaryShown, computeWeeklySummaryData } from '../../lib/weeklySummary'
 import WeeklySummaryModal from '../../components/WeeklySummaryModal'
 
+const PAGE_SIZE = 5
+
+function Pagination({ page, total, onPrev, onNext, testIdPrefix }) {
+  const totalPages = Math.ceil(total / PAGE_SIZE)
+  if (totalPages <= 1) return null
+  return (
+    <div className="flex items-center justify-between mt-3">
+      <button
+        onClick={onPrev}
+        disabled={page === 0}
+        className="text-xs text-gray-500 hover:text-gray-800 disabled:invisible px-2 py-1 min-h-[44px]"
+        aria-label="Previous"
+      >
+        ← Previous
+      </button>
+      <span
+        className="text-xs text-gray-400"
+        data-testid={testIdPrefix ? `${testIdPrefix}-page-indicator` : undefined}
+      >
+        {page + 1} / {totalPages}
+      </span>
+      <button
+        onClick={onNext}
+        disabled={page >= totalPages - 1}
+        className="text-xs text-gray-500 hover:text-gray-800 disabled:invisible px-2 py-1 min-h-[44px]"
+        aria-label="Next"
+        data-testid={testIdPrefix ? `${testIdPrefix}-next` : undefined}
+      >
+        Next →
+      </button>
+    </div>
+  )
+}
+
 export default function StudentHome() {
   const { profile, signOut } = useAuth()
   const navigate = useNavigate()
@@ -19,6 +53,8 @@ export default function StudentHome() {
   const [dailyLimit, setDailyLimit] = useState(null)
   const [loading, setLoading] = useState(true)
   const [weeklySummary, setWeeklySummary] = useState(null)
+  const [todoPage, setTodoPage] = useState(0)
+  const [sessionsPage, setSessionsPage] = useState(0)
 
   useEffect(() => {
     async function load() {
@@ -40,7 +76,9 @@ export default function StudentHome() {
       setHasReadToday(countToday > 0)
       setTodayCount(countToday)
       setDailyLimit(settings?.daily_session_limit ?? 5)
-      setSessions(allSessions.slice(0, 10))
+      setSessions(allSessions)
+      setTodoPage(0)
+      setSessionsPage(0)
       setLoading(false)
       if (allSessions.length > 0 && shouldShowWeeklySummary(profile.id)) {
         setWeeklySummary(computeWeeklySummaryData(allSessions))
@@ -53,6 +91,9 @@ export default function StudentHome() {
     markWeeklySummaryShown(profile.id)
     setWeeklySummary(null)
   }
+
+  const pagedTodo = todo.slice(todoPage * PAGE_SIZE, (todoPage + 1) * PAGE_SIZE)
+  const pagedSessions = sessions.slice(sessionsPage * PAGE_SIZE, (sessionsPage + 1) * PAGE_SIZE)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -118,22 +159,30 @@ export default function StudentHome() {
           ) : todo.length === 0 && retry.length === 0 ? (
             <p className="text-sm text-gray-400">No passages assigned yet.</p>
           ) : (
-            <div className="space-y-2">
-              {todo.map(p => (
-                <div key={p.id} className="bg-white rounded-xl border border-gray-200 px-4 py-3 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">{p.title}</p>
-                    <p className="text-xs text-gray-400">{p.word_count} words · {p.grade_level === 'MBA' ? 'MBA' : `Grade ${p.grade_level}`} · {p.difficulty ?? 'Easy'}</p>
+            <>
+              <div className="space-y-2">
+                {pagedTodo.map(p => (
+                  <div key={p.id} className="bg-white rounded-xl border border-gray-200 px-4 py-3 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">{p.title}</p>
+                      <p className="text-xs text-gray-400">{p.word_count} words · {p.grade_level === 'MBA' ? 'MBA' : `Grade ${p.grade_level}`} · {p.difficulty ?? 'Easy'}</p>
+                    </div>
+                    <button
+                      onClick={() => navigate(`/student/session/${p.id}`)}
+                      className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                    >
+                      Start Reading
+                    </button>
                   </div>
-                  <button
-                    onClick={() => navigate(`/student/session/${p.id}`)}
-                    className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                  >
-                    Start Reading
-                  </button>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+              <Pagination
+                page={todoPage}
+                total={todo.length}
+                onPrev={() => setTodoPage(p => p - 1)}
+                onNext={() => setTodoPage(p => p + 1)}
+              />
+            </>
           )}
         </section>
 
@@ -168,24 +217,34 @@ export default function StudentHome() {
           {sessions.length === 0 ? (
             <p className="text-sm text-gray-400">No sessions yet.</p>
           ) : (
-            <div className="space-y-2">
-              {sessions.map(s => (
-                <div
-                  key={s.id}
-                  onClick={() => navigate(`/student/report/${s.id}`)}
-                  className="bg-white rounded-xl border border-gray-200 px-4 py-3 flex items-center justify-between cursor-pointer hover:border-blue-300 transition-colors"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">{s.passages?.title}</p>
-                    <p className="text-xs text-gray-400">{new Date(s.created_at).toLocaleDateString()}</p>
+            <>
+              <div className="space-y-2">
+                {pagedSessions.map(s => (
+                  <div
+                    key={s.id}
+                    data-testid="session-row"
+                    onClick={() => navigate(`/student/report/${s.id}`)}
+                    className="bg-white rounded-xl border border-gray-200 px-4 py-3 flex items-center justify-between cursor-pointer hover:border-blue-300 transition-colors"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">{s.passages?.title}</p>
+                      <p className="text-xs text-gray-400">{new Date(s.created_at).toLocaleDateString()}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-blue-600">{s.score_accuracy}%</p>
+                      <p className="text-xs text-gray-400">{s.score_wpm} WPM</p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold text-blue-600">{s.score_accuracy}%</p>
-                    <p className="text-xs text-gray-400">{s.score_wpm} WPM</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+              <Pagination
+                page={sessionsPage}
+                total={sessions.length}
+                onPrev={() => setSessionsPage(p => p - 1)}
+                onNext={() => setSessionsPage(p => p + 1)}
+                testIdPrefix="sessions"
+              />
+            </>
           )}
         </section>
       </main>

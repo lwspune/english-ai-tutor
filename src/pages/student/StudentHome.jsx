@@ -21,6 +21,7 @@ export default function StudentHome() {
   const [loading, setLoading] = useState(true)
   const [weeklySummary, setWeeklySummary] = useState(null)
   const [todoPage, setTodoPage] = useState(0)
+  const [retryPage, setRetryPage] = useState(0)
   const [sessionsPage, setSessionsPage] = useState(0)
 
   useEffect(() => {
@@ -45,6 +46,7 @@ export default function StudentHome() {
       setDailyLimit(settings?.daily_session_limit ?? 5)
       setSessions(allSessions)
       setTodoPage(0)
+      setRetryPage(0)
       setSessionsPage(0)
       setLoading(false)
       if (allSessions.length > 0 && shouldShowWeeklySummary(profile.id)) {
@@ -60,6 +62,7 @@ export default function StudentHome() {
   }
 
   const pagedTodo = todo.slice(todoPage * PAGE_SIZE, (todoPage + 1) * PAGE_SIZE)
+  const pagedRetry = retry.slice(retryPage * PAGE_SIZE, (retryPage + 1) * PAGE_SIZE)
   const pagedSessions = sessions.slice(sessionsPage * PAGE_SIZE, (sessionsPage + 1) * PAGE_SIZE)
 
   return (
@@ -158,8 +161,8 @@ export default function StudentHome() {
             <h2 className="text-base font-semibold text-gray-700 mb-1">Keep Practising</h2>
             <p className="text-xs text-gray-400 mb-3">You haven't mastered these yet. Give them another go.</p>
             <div className="space-y-2">
-              {retry.map(p => (
-                <div key={p.id} className="bg-amber-50 rounded-xl border border-amber-200 px-4 py-3 flex items-center justify-between">
+              {pagedRetry.map(p => (
+                <div key={p.id} data-testid="retry-row" className="bg-amber-50 rounded-xl border border-amber-200 px-4 py-3 flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-800">{p.title}</p>
                     <p className="text-xs text-gray-500">
@@ -176,6 +179,13 @@ export default function StudentHome() {
                 </div>
               ))}
             </div>
+            <Pagination
+              page={retryPage}
+              total={retry.length}
+              onPrev={() => setRetryPage(p => p - 1)}
+              onNext={() => setRetryPage(p => p + 1)}
+              testIdPrefix="retry"
+            />
           </section>
         )}
 

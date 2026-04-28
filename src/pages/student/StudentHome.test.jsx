@@ -168,6 +168,56 @@ describe('StudentHome — assigned passages pagination', () => {
   })
 })
 
+describe('StudentHome — keep practising pagination', () => {
+  function makeRetrySetup(count) {
+    const passages = Array.from({ length: count }, (_, i) => ({
+      id: `rp${i}`, title: `Retry Passage ${i}`, word_count: 100, grade_level: 10, difficulty: 'easy',
+    }))
+    const sessions = passages.map((p, i) => ({
+      id: `rs${i}`, passage_id: p.id, score_accuracy: 60, score_wpm: 120,
+      created_at: new Date(2026, 3, 10 - i).toISOString(), passages: { title: p.title },
+    }))
+    return { passages, sessions }
+  }
+
+  it('shows at most 5 retry passages on the first page', async () => {
+    const { passages, sessions } = makeRetrySetup(8)
+    passagesRef.data = passages
+    sessionsRef.data = sessions
+    render(<StudentHome />)
+    await waitFor(() => document.querySelector('[data-testid="retry-row"]'))
+    expect(document.querySelectorAll('[data-testid="retry-row"]')).toHaveLength(5)
+  })
+
+  it('does not show Next button when 5 or fewer retry passages', async () => {
+    const { passages, sessions } = makeRetrySetup(4)
+    passagesRef.data = passages
+    sessionsRef.data = sessions
+    render(<StudentHome />)
+    await waitFor(() => document.querySelector('[data-testid="retry-row"]'))
+    expect(screen.queryByRole('button', { name: /next/i })).not.toBeInTheDocument()
+  })
+
+  it('shows Next button when more than 5 retry passages', async () => {
+    const { passages, sessions } = makeRetrySetup(7)
+    passagesRef.data = passages
+    sessionsRef.data = sessions
+    render(<StudentHome />)
+    await waitFor(() => document.querySelector('[data-testid="retry-row"]'))
+    expect(screen.getByTestId('retry-next')).toBeInTheDocument()
+  })
+
+  it('clicking Next shows the second page of retry passages', async () => {
+    const { passages, sessions } = makeRetrySetup(7)
+    passagesRef.data = passages
+    sessionsRef.data = sessions
+    render(<StudentHome />)
+    await waitFor(() => document.querySelector('[data-testid="retry-row"]'))
+    fireEvent.click(screen.getByTestId('retry-next'))
+    expect(document.querySelectorAll('[data-testid="retry-row"]')).toHaveLength(2)
+  })
+})
+
 describe('StudentHome — recent sessions pagination', () => {
   it('shows at most 5 sessions on the first page', async () => {
     sessionsRef.data = Array.from({ length: 8 }, (_, i) => makeSession(i))

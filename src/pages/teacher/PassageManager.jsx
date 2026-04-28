@@ -15,6 +15,7 @@ export default function PassageManager() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [showForm, setShowForm] = useState(false)
+  const [editingPassageId, setEditingPassageId] = useState(null)
   const [expandedPassageId, setExpandedPassageId] = useState(null)
   const [questionsByPassage, setQuestionsByPassage] = useState({})
   const [questionCounts, setQuestionCounts] = useState({})
@@ -38,19 +39,48 @@ export default function PassageManager() {
     }
   }
 
+  function startAdd() {
+    setForm(EMPTY_FORM)
+    setEditingPassageId(null)
+    setShowForm(true)
+  }
+
+  function startEdit(p) {
+    setForm({ title: p.title, content: p.content, grade_level: p.grade_level ?? '9', difficulty: p.difficulty ?? 'easy' })
+    setEditingPassageId(p.id)
+    setShowForm(true)
+  }
+
+  function cancelForm() {
+    setForm(EMPTY_FORM)
+    setEditingPassageId(null)
+    setShowForm(false)
+  }
+
   async function handleSave(e) {
     e.preventDefault()
     setSaving(true)
     const wordCount = form.content.trim().split(/\s+/).length
-    await supabase.from('passages').insert({
-      title: form.title,
-      content: form.content.trim(),
-      grade_level: form.grade_level,
-      difficulty: form.difficulty,
-      word_count: wordCount,
-      created_by: profile.id,
-    })
+    if (editingPassageId) {
+      await supabase.from('passages').update({
+        title: form.title,
+        content: form.content.trim(),
+        grade_level: form.grade_level,
+        difficulty: form.difficulty,
+        word_count: wordCount,
+      }).eq('id', editingPassageId)
+    } else {
+      await supabase.from('passages').insert({
+        title: form.title,
+        content: form.content.trim(),
+        grade_level: form.grade_level,
+        difficulty: form.difficulty,
+        word_count: wordCount,
+        created_by: profile.id,
+      })
+    }
     setForm(EMPTY_FORM)
+    setEditingPassageId(null)
     setShowForm(false)
     setSaving(false)
     loadPassages()
@@ -93,6 +123,20 @@ export default function PassageManager() {
     setQuestionCounts(prev => ({ ...prev, [passageId]: (prev[passageId] ?? 0) + 1 }))
   }
 
+  async function handleUpdateQuestion(passageId, questionId, questionData) {
+    const { data, error } = await supabase
+      .from('questions')
+      .update(questionData)
+      .eq('id', questionId)
+      .select()
+      .single()
+    if (error) { alert(error.message); return }
+    setQuestionsByPassage(prev => ({
+      ...prev,
+      [passageId]: (prev[passageId] ?? []).map(q => q.id === questionId ? { ...q, ...data } : q),
+    }))
+  }
+
   async function handleDeleteQuestion(passageId, questionId) {
     await supabase.from('questions').delete().eq('id', questionId)
     setQuestionsByPassage(prev => ({
@@ -110,7 +154,7 @@ export default function PassageManager() {
           <h1 className="text-base font-semibold text-gray-800">Passage Library</h1>
         </div>
         <button
-          onClick={() => setShowForm(v => !v)}
+          onClick={showForm ? cancelForm : startAdd}
           className="bg-blue-600 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-blue-700 transition-colors"
         >
           {showForm ? 'Cancel' : '+ Add Passage'}
@@ -120,7 +164,9 @@ export default function PassageManager() {
       <main className="max-w-3xl mx-auto px-4 py-6 space-y-5">
         {showForm && (
           <form onSubmit={handleSave} className="bg-white rounded-2xl border border-gray-200 p-5 space-y-4">
-            <h2 className="text-sm font-semibold text-gray-700">New Passage</h2>
+            <h2 className="text-sm font-semibold text-gray-700">
+              {editingPassageId ? 'Edit Passage' : 'New Passage'}
+            </h2>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Title</label>
               <input
@@ -170,13 +216,22 @@ export default function PassageManager() {
                 </select>
               </div>
             </div>
-            <button
-              type="submit"
-              disabled={saving}
-              className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
-            >
-              {saving ? 'Saving...' : 'Save Passage'}
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                disabled={saving}
+                className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                {saving ? 'Saving...' : editingPassageId ? 'Save Changes' : 'Save Passage'}
+              </button>
+              <button
+                type="button"
+                onClick={cancelForm}
+                className="px-5 py-2 rounded-lg text-sm font-medium border border-gray-300 hover:bg-gray-100 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
           </form>
         )}
 
@@ -195,12 +250,20 @@ export default function PassageManager() {
                     <p className="text-xs text-gray-500 mt-1 line-clamp-2">{p.content}</p>
                   </div>
                   <div className="flex flex-col items-end gap-2 shrink-0">
-                    <button
-                      onClick={() => handleDelete(p.id)}
-                      className="text-xs text-red-400 hover:text-red-600"
-                    >
-                      Delete
-                    </button>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => startEdit(p)}
+                        className="text-xs text-blue-500 hover:text-blue-700"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(p.id)}
+                        className="text-xs text-red-400 hover:text-red-600"
+                      >
+                        Delete
+                      </button>
+                    </div>
                     <button
                       onClick={() => toggleQuestions(p.id)}
                       className="text-xs text-blue-600 hover:text-blue-800 font-medium whitespace-nowrap min-h-[44px] flex items-center"
@@ -213,6 +276,7 @@ export default function PassageManager() {
                   <QuestionPanel
                     questions={questions}
                     onSave={q => handleSaveQuestion(p.id, q)}
+                    onUpdate={(qId, data) => handleUpdateQuestion(p.id, qId, data)}
                     onDelete={qId => handleDeleteQuestion(p.id, qId)}
                   />
                 )}

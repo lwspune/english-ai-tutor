@@ -2,9 +2,11 @@ import { useState } from 'react'
 
 const EMPTY_FORM = { question_text: '', options: ['', '', '', ''], correct_index: 0 }
 
-export default function QuestionPanel({ questions, onSave, onDelete }) {
+export default function QuestionPanel({ questions, onSave, onDelete, onUpdate }) {
   const [form, setForm] = useState(EMPTY_FORM)
+  const [editingId, setEditingId] = useState(null)
   const atLimit = questions.length >= 5
+  const showForm = !atLimit || editingId !== null
 
   function setOption(index, value) {
     setForm(f => {
@@ -14,9 +16,25 @@ export default function QuestionPanel({ questions, onSave, onDelete }) {
     })
   }
 
+  function startEdit(q) {
+    setEditingId(q.id)
+    setForm({ question_text: q.question_text, options: [...q.options], correct_index: q.correct_index })
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+    setForm(EMPTY_FORM)
+  }
+
   function handleSubmit(e) {
     e.preventDefault()
-    onSave({ question_text: form.question_text, options: form.options, correct_index: form.correct_index })
+    const data = { question_text: form.question_text, options: form.options, correct_index: form.correct_index }
+    if (editingId) {
+      onUpdate(editingId, data)
+      setEditingId(null)
+    } else {
+      onSave(data)
+    }
     setForm(EMPTY_FORM)
   }
 
@@ -32,13 +50,22 @@ export default function QuestionPanel({ questions, onSave, onDelete }) {
                 <span className="text-gray-400 mr-1">{i + 1}.</span>
                 <span>{q.question_text}</span>
               </p>
-              <button
-                type="button"
-                onClick={() => onDelete(q.id)}
-                className="text-xs text-red-400 hover:text-red-600 shrink-0"
-              >
-                Delete
-              </button>
+              <div className="flex gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => startEdit(q)}
+                  className="text-xs text-blue-500 hover:text-blue-700"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDelete(q.id)}
+                  className="text-xs text-red-400 hover:text-red-600"
+                >
+                  Delete
+                </button>
+              </div>
             </div>
             <ul className="mt-2 space-y-1">
               {q.options.map((opt, j) => (
@@ -54,11 +81,15 @@ export default function QuestionPanel({ questions, onSave, onDelete }) {
           </div>
         ))}
 
-      {atLimit ? (
+      {!showForm && (
         <p className="text-xs text-amber-600 font-medium">Maximum of 5 questions reached for this passage.</p>
-      ) : (
+      )}
+
+      {showForm && (
         <form onSubmit={handleSubmit} className="bg-blue-50 rounded-lg border border-blue-200 p-3 space-y-3">
-          <p className="text-xs font-semibold text-blue-800">Add Question ({questions.length}/5)</p>
+          <p className="text-xs font-semibold text-blue-800">
+            {editingId ? 'Edit Question' : `Add Question (${questions.length}/5)`}
+          </p>
           <input
             value={form.question_text}
             onChange={e => setForm(f => ({ ...f, question_text: e.target.value }))}
@@ -88,12 +119,23 @@ export default function QuestionPanel({ questions, onSave, onDelete }) {
             ))}
           </div>
           <p className="text-xs text-gray-500">Select the radio button next to the correct answer.</p>
-          <button
-            type="submit"
-            className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors min-h-[44px]"
-          >
-            Add Question
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors min-h-[44px]"
+            >
+              {editingId ? 'Save Changes' : 'Add Question'}
+            </button>
+            {editingId && (
+              <button
+                type="button"
+                onClick={cancelEdit}
+                className="text-sm px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-100 transition-colors min-h-[44px]"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
         </form>
       )}
     </div>

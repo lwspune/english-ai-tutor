@@ -55,7 +55,7 @@ Show a brief summary on the first login of a new week: passages read, accuracy t
 - All student-facing screens must be mobile-first. Use Tailwind responsive prefixes (`sm:`, `md:`) and test layouts at 375px width. Touch targets must be at least 44px. Avoid horizontal scroll.
 
 ### Backend Integrity
-- Enforce data rules at the DB level (FK, CHECK constraints, NOT NULL, triggers), not just in app code. Validate and reject bad input at the edge function boundary before any external API call (fail fast). Use transactions for multi-step writes. Return a consistent shape: `{ data }` on success, `{ error }` on failure. Keep all scoring and business logic server-side — never in client JS.
+- Validate and reject bad input at the edge function boundary before any external API call (fail fast). Return `{ data }` on success, `{ error }` on failure from all edge functions. Keep all scoring and business logic server-side.
 
 ### Accessibility
 - Use Tailwind `focus-visible:` utilities for focus styles on all interactive elements.
@@ -64,10 +64,10 @@ Show a brief summary on the first login of a new week: passages read, accuracy t
 - Golden path must be verified in the browser at 375px width specifically.
 
 ### Security
-- Validate and sanitize all user input at system boundaries. Avoid XSS — never use `dangerouslySetInnerHTML` with user-supplied content. Keep RLS enabled on all Supabase tables.
+- Never use `dangerouslySetInnerHTML` with user-supplied content. Keep RLS enabled on all Supabase tables.
 
 ### Dependency Management
-- Existing stack is React, Tailwind, and Supabase — exhaust these before adding a new package.
+- Stack is React 19, Tailwind v4, and Supabase — exhaust these before adding any package.
 
 ### Test Scope
 - For edge functions, prefer integration tests over mocks.
@@ -87,11 +87,14 @@ npm run lint       # ESLint
 npm run preview    # preview production build locally
 ```
 
-Edge function (Deno, deploy always with `--no-verify-jwt`). On Windows CMD use two lines:
+Edge functions (Deno, always deploy with `--no-verify-jwt`). On Windows CMD:
 ```cmd
 set SUPABASE_ACCESS_TOKEN=<token>
 npx supabase functions deploy analyze-reading --no-verify-jwt
+npx supabase functions deploy create-student --no-verify-jwt
+npx supabase functions deploy reset-student-password --no-verify-jwt
 ```
+In bash (Git Bash / WSL): `SUPABASE_ACCESS_TOKEN=<token> npx supabase functions deploy <name> --no-verify-jwt`
 
 ## Architecture
 
@@ -111,9 +114,9 @@ English reading-aloud evaluation app for students (grades 9–12 and MBA) with a
    - Calls Whisper API (`verbose_json`, word-level timestamps)
    - Aligns spoken words to passage using DP sequence alignment (not positional matching)
    - Computes `score_accuracy`, `score_wpm`, `score_phrasing`, `count_omissions`, `count_substitutions`
-   - If AI feedback on AND transcript coverage ≥ 20%: calls GPT-4o-mini → structured JSON feedback
+   - If AI feedback on AND transcript coverage ≥ 20%: calls GPT-4o-mini → structured JSON feedback; captures `llm_input_tokens` + `llm_output_tokens` from `usage` field
    - Falls back to rule-based feedback if AI is off or GPT fails
-   - Saves `sessions` row → deletes audio → returns `{ sessionId }`
+   - Saves `sessions` row (including `whisper_duration_seconds`, `llm_input_tokens`, `llm_output_tokens`) → deletes audio → returns `{ sessionId }`
 5. Student redirected to `/student/report/:sessionId` — word-by-word colour-coded report with structured feedback
 
 ### Metrics
@@ -154,16 +157,21 @@ After a reading session, if the passage has questions attached:
 - **AI Feedback toggle** — global on/off button in the header, persisted in `app_settings` table
 - **Daily limit stepper** — −/N/+ control in header (clamped 1–20); updates `app_settings.daily_session_limit` immediately
 - **Class code display** — shown in header with one-tap copy; students use this code to self-register
+- **Add Student button** — opens `AddStudentModal` (two tabs: Single student form / Import CSV); calls `create-student` edge function; refreshes class list on success
+- **Class Performance table** — per-student: sessions, avg accuracy, avg WPM, last session, total OpenAI cost; class total cost shown below table
 - **Passage Completion** (`/teacher/completion`) — per-passage cards showing count completed + chips for students who haven't read yet; chips link to student detail
-- **Student detail** (`/teacher/student/:id`) — summary stats, sparkline performance trends (Accuracy, Pace, Phrasing, Comprehension), recurring difficult words, session progress table with ↑/↓ trend arrows, comprehension Reset button, and expandable per-session AI feedback panel (click "Feedback" to toggle)
+- **Student detail** (`/teacher/student/:id`) — summary stats, sparkline performance trends (Accuracy, Pace, Phrasing, Comprehension), recurring difficult words, session progress table with ↑/↓ trend arrows, per-session OpenAI cost, comprehension Reset button, expandable per-session AI feedback panel, and Reset Password button (calls `reset-student-password` edge function)
 - **Question Manager** — inline panel per passage in `PassageManager`; add/delete MCQs (3–5 per passage, DB-enforced by trigger)
 
 ### Shared components / lib
 - `src/components/PerformanceCharts.jsx` — exports `MetricCard` (sparkline card with Latest/Best/Change stats); used in both `StudentProgress` and `StudentDetail`
+- `src/components/AddStudentModal.jsx` — two-tab modal (Single / Import CSV) for teacher to add students; calls `create-student` edge function
 - `src/lib/wpmTargets.js` — exports `WPM_TARGETS` constant `{ 9: 140, 10: 150, 11: 160, 12: 170, MBA: 180 }`
 - `src/lib/studentStats.js` — exports `computeAvgComprehension(sessions)`
 - `src/lib/passageClassifier.js` — exports `classifyPassages(passages, sessions)` → `{ todo, retry }`; mastery threshold `MASTERY_THRESHOLD = 80`
 - `src/lib/streak.js` — exports `computeStreak(sessions, today)` → number; school days (Mon–Fri) only, IST timezone
+- `src/lib/costUtils.js` — exports `computeSessionCost({ whisper_duration_seconds, llm_input_tokens, llm_output_tokens })` → USD or null; `formatCost(usd)` → `"$0.0042"` or `"—"`. Pricing: Whisper $0.006/min, GPT-4o-mini $0.15/$0.60 per 1M tokens
+- `src/lib/edgeFunctionError.js` — exports `extractEdgeFunctionError(fnError)`; reads JSON body from `fnError.context.json()` and returns `body.error`, falling back to `fnError.message`. Use this instead of `data?.error` because `data` is always `null` for non-2xx edge function responses
 
 ### Auth & routing
 - `AuthContext` holds both the Supabase `user` and app `profile` (from `profiles` table). Always use `profile` for role/grade — never `user.user_metadata` in components.
@@ -175,7 +183,7 @@ After a reading session, if the passage has questions attached:
 ### Database schema (key points)
 - `profiles` — `role` is `teacher` or `student`; `grade` is `text` (`'9'`–`'12'` or `'MBA'`, null for teachers); migration 009 changed this from `int`
 - `passages` — `word_count` computed client-side on insert in `PassageManager`; `grade_level` is `text` (`'9'`–`'12'` or `'MBA'`, nullable for all-grades passages); migration 009 changed this from `int`
-- `sessions` — `word_results` JSONB `[{ word, spoken, status }]`, status ∈ `correct | substitution | omission`; also stores `score_accuracy`, `score_wpm`, `score_phrasing`, `score_fluency` (same as phrasing, kept for compat), `count_omissions`, `count_substitutions`, `feedback` (JSON string or plain text), `score_comprehension` (int nullable), `comprehension_answers` (jsonb nullable — `[{ question_id, selected_index, is_correct }]`)
+- `sessions` — `word_results` JSONB `[{ word, spoken, status }]`, status ∈ `correct | substitution | omission`; also stores `score_accuracy`, `score_wpm`, `score_phrasing`, `score_fluency` (same as phrasing, kept for compat), `count_omissions`, `count_substitutions`, `feedback` (JSON string or plain text), `score_comprehension` (int nullable), `comprehension_answers` (jsonb nullable — `[{ question_id, selected_index, is_correct }]`), `whisper_duration_seconds` (numeric nullable), `llm_input_tokens` (int nullable), `llm_output_tokens` (int nullable) — the last three are null for sessions recorded before migration 010
 - `questions` — `passage_id` FK, `question_text`, `options` (jsonb array of 4 strings), `correct_index` (0–3), `display_order`; max 5 per passage enforced by DB trigger `enforce_question_limit`
 - `app_settings` — single-row table (`id boolean PK default true`), holds `ai_feedback_enabled boolean`, `class_code text` (random 6-char code set on migration; teacher shares with students for self-registration), `daily_session_limit int` (default 5; teacher adjusts via dashboard stepper, clamped 1–20)
 - RLS on all tables. `is_teacher()` security definer function used in profiles policy to avoid infinite recursion.
@@ -185,8 +193,10 @@ After a reading session, if the passage has questions attached:
 - `reset_comprehension(p_session_id)` — teacher-only; clears `score_comprehension` and `comprehension_answers` for a session
 - `validate_class_code(p_code)` — callable by anon; returns boolean; used during student signup
 
-### Edge function error handling
-`src/lib/edgeFunctionError.js` — `extractEdgeFunctionError(fnError)` reads the JSON body from `fnError.context.json()` and returns `body.error` if present, falling back to `fnError.message`. Use this instead of `data?.error || fnError.message` because `data` is always `null` for non-2xx responses from `supabase.functions.invoke`.
+### Edge functions
+- `analyze-reading` — main reading evaluation pipeline (Whisper + GPT-4o-mini); saves cost metrics to sessions
+- `create-student` — teacher creates one or many students; accepts `{ students: [{ full_name, email, password, grade }] }`; verifies caller is teacher; uses `auth.admin.createUser` with `email_confirm: true`; `handle_new_user` trigger auto-creates profiles
+- `reset-student-password` — teacher resets a student's password; accepts `{ student_id, new_password }`; verifies caller is teacher; guards against resetting non-student accounts; uses `auth.admin.updateUserById`
 
 ### Known production quirks
 - **Edge function must be deployed with `--no-verify-jwt`** — Supabase's new `sb_publishable_...` key format is not a JWT, so the runtime rejects requests otherwise.
@@ -195,7 +205,7 @@ After a reading session, if the passage has questions attached:
 - **Email confirmation:** If Supabase Auth email confirmation is enabled, students see a "check your email" screen after signup. For school use, consider disabling it (Auth → Settings → disable email confirmations).
 - **Storage RLS:** `storage.objects` has a policy `students can upload audio` allowing authenticated users to upload to their own folder (`{uid}/...`). Service role in the edge function bypasses this for downloads.
 - **Class code:** Set once by migration (random 6-char hex). To change it: `update app_settings set class_code = 'NEWCODE' where id = true;`
-- **Creating student accounts manually (bulk/admin):** Insert directly into `auth.users` with `crypt(password, gen_salt('bf'))` and `raw_user_meta_data: { full_name, role: 'student', grade }`. The `handle_new_user` trigger fires automatically and creates the profile. Do NOT use the Supabase dashboard UI for this — it doesn't set `raw_user_meta_data`.
+- **Creating student accounts:** Use the "Add Student" button on the teacher dashboard (single or CSV bulk). For emergency SQL inserts: use `auth.users` directly with `crypt(password, gen_salt('bf'))` and `raw_user_meta_data: { full_name, role: 'student', grade }` — do NOT use the Supabase dashboard UI as it doesn't set `raw_user_meta_data`.
 
 ### Environment variables
 Frontend (`.env.local`):
@@ -224,6 +234,7 @@ Key product and architecture decisions captured here so future sessions don't re
 | Teacher adds students from dashboard | `create-student` edge function (service role); teacher-set password; `email_confirm: true` | Service role key cannot be in the browser; teacher-set password is simpler than invite email for a school context where teachers distribute credentials |
 | CSV bulk import | Client-side parse (native FileReader + split); validation preview before import; same edge function as single-add (array payload) | No library needed for simple CSV; previewing errors before import prevents surprises |
 | Teacher resets student password | `reset-student-password` edge function; guards against resetting non-student accounts | Requires service role; guard prevents a teacher accidentally resetting another teacher's password |
+| OpenAI cost tracking | Store raw metrics (`whisper_duration_seconds`, `llm_input_tokens`, `llm_output_tokens`); compute cost in JS at render time | Raw metrics survive pricing changes; `costUtils.js` is the single place to update rates |
 
 ### Adding teacher accounts (manual process)
 ```sql

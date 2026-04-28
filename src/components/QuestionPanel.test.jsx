@@ -60,7 +60,55 @@ describe('QuestionPanel', () => {
       correct_index: 0,
       display_order: i,
     }))
-    render(<QuestionPanel questions={full} onSave={vi.fn()} onDelete={vi.fn()} />)
+    render(<QuestionPanel questions={full} onSave={vi.fn()} onDelete={vi.fn()} onUpdate={vi.fn()} />)
     expect(screen.getByText(/maximum of 5 questions/i)).toBeInTheDocument()
+  })
+
+  it('shows an Edit button on each question row', () => {
+    render(<QuestionPanel questions={mockQuestions} onSave={vi.fn()} onDelete={vi.fn()} onUpdate={vi.fn()} />)
+    expect(screen.getByRole('button', { name: /edit/i })).toBeInTheDocument()
+  })
+
+  it('clicking Edit pre-fills the form with the question data', () => {
+    render(<QuestionPanel questions={mockQuestions} onSave={vi.fn()} onDelete={vi.fn()} onUpdate={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: /edit/i }))
+    expect(screen.getByPlaceholderText('Question text').value).toBe('What is the main theme?')
+    expect(screen.getAllByPlaceholderText(/Option [A-D]/)[0].value).toBe('Love')
+    expect(screen.getAllByPlaceholderText(/Option [A-D]/)[1].value).toBe('War')
+  })
+
+  it('submitting an edited question calls onUpdate, not onSave', () => {
+    const onSave = vi.fn()
+    const onUpdate = vi.fn()
+    render(<QuestionPanel questions={mockQuestions} onSave={onSave} onDelete={vi.fn()} onUpdate={onUpdate} />)
+    fireEvent.click(screen.getByRole('button', { name: /edit/i }))
+    fireEvent.change(screen.getByPlaceholderText('Question text'), {
+      target: { value: 'Updated question?' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }))
+    expect(onUpdate).toHaveBeenCalledWith('q1', expect.objectContaining({ question_text: 'Updated question?' }))
+    expect(onSave).not.toHaveBeenCalled()
+  })
+
+  it('Cancel edit resets form and returns to add mode', () => {
+    render(<QuestionPanel questions={mockQuestions} onSave={vi.fn()} onDelete={vi.fn()} onUpdate={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: /edit/i }))
+    expect(screen.getByPlaceholderText('Question text').value).toBe('What is the main theme?')
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
+    expect(screen.getByPlaceholderText('Question text').value).toBe('')
+  })
+
+  it('shows edit form even when at 5-question limit', () => {
+    const full = Array.from({ length: 5 }, (_, i) => ({
+      id: `q${i}`,
+      question_text: `Q${i}`,
+      options: ['A', 'B', 'C', 'D'],
+      correct_index: 0,
+      display_order: i,
+    }))
+    render(<QuestionPanel questions={full} onSave={vi.fn()} onDelete={vi.fn()} onUpdate={vi.fn()} />)
+    fireEvent.click(screen.getAllByRole('button', { name: /edit/i })[0])
+    expect(screen.getByPlaceholderText('Question text')).toBeInTheDocument()
+    expect(screen.queryByText(/maximum of 5 questions/i)).not.toBeInTheDocument()
   })
 })

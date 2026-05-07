@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/AuthContext'
 import { MetricCard } from '../../components/PerformanceCharts'
 import { WPM_TARGETS } from '../../lib/wpmTargets'
+import BottomNav from '../../components/BottomNav'
 
 export default function StudentProgress() {
   const { profile } = useAuth()
@@ -38,16 +39,16 @@ export default function StudentProgress() {
     : Math.ceil(wpmTarget * 1.2 / 10) * 10
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
+    <div className="min-h-screen bg-slate-50 pb-20">
+      <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3">
         <button
           onClick={() => navigate('/student')}
-          className="text-gray-500 hover:text-gray-800 text-sm min-h-[44px] flex items-center"
+          className="text-slate-500 hover:text-slate-800 text-sm min-h-[44px] flex items-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 rounded"
           aria-label="Back to home"
         >
           ← Back
         </button>
-        <h1 className="text-base font-semibold text-gray-800">My Progress</h1>
+        <h1 className="text-base font-semibold text-slate-800">My Progress</h1>
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-4">
@@ -111,6 +112,8 @@ export default function StudentProgress() {
           </>
         )}
       </main>
+
+      <BottomNav />
     </div>
   )
 }

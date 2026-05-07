@@ -40,8 +40,8 @@ After every scored attempt, compare against all previous attempts on the same it
 ### Milestones — not yet built
 Mark real learning events, not arbitrary game points. Good milestones: first 80%+ accuracy, 5-passage streak, improved accuracy week-over-week, first comprehension quiz completed. Bad milestones: "logged in 3 days in a row", "earned 100 XP". Each milestone must correspond to a genuine learning achievement.
 
-### Weekly summary — not yet built
-Show a brief summary on the first login of a new week: passages read, accuracy trend, streak status. One screen, no navigation required. Drives return visits by making the week's work visible.
+### Weekly summary — built
+Shows on the first load of `StudentHome` each new Mon–Sun week (IST). Displays passages read last week, accuracy with ↑/↓/→ trend vs the prior week, and current streak. Single "Let's go!" dismiss button. Skipped for brand-new students with no sessions. localStorage key `weekly_summary_seen_{studentId}` tracks the seen week so it won't repeat. Implementation: `src/lib/weeklySummary.js` + `src/components/WeeklySummaryModal.jsx`.
 
 ### What to avoid
 - Leaderboards: demotivate the bottom half of the class in a known-peer setting.
@@ -147,7 +147,7 @@ After a reading session, if the passage has questions attached:
 - Teacher can reset a student's comprehension attempt via the `reset_comprehension` RPC (button in StudentDetail Comp. column)
 
 ### Student pages
-- `StudentHome` (`/student`) — "Assigned Passages" (new) + "Keep Practising" (amber, <80% mastery, attempts left) + streak card + daily counter chip (X of N today, red at limit) + last 10 sessions + "My Progress" banner
+- `StudentHome` (`/student`) — "Assigned Passages" + "Keep Practising" (amber, <80% mastery, attempts left) + "Recent Sessions"; all three lists paginated at 5 per page via `Pagination`; also shows streak card, daily counter chip (X of N today, red at limit), "My Progress" banner, weekly summary modal (first visit of each new week)
 - `ReadingSession` (`/student/session/:passageId`) — audio recording; Start Recording disabled when per-passage attempt limit (3) OR daily session limit is reached
 - `SessionReport` (`/student/report/:sessionId`) — word-by-word results + feedback + personal best banner (accuracy + WPM vs prior attempts on same passage) + comprehension CTA
 - `ComprehensionQuiz` (`/student/comprehension/:sessionId`) — once-only quiz with confirmation modal
@@ -161,7 +161,8 @@ After a reading session, if the passage has questions attached:
 - **Class Performance table** — per-student: sessions, avg accuracy, avg WPM, last session, total OpenAI cost; class total cost shown below table
 - **Passage Completion** (`/teacher/completion`) — per-passage cards showing count completed + chips for students who haven't read yet; chips link to student detail
 - **Student detail** (`/teacher/student/:id`) — summary stats, sparkline performance trends (Accuracy, Pace, Phrasing, Comprehension), recurring difficult words, session progress table with ↑/↓ trend arrows, per-session OpenAI cost, comprehension Reset button, expandable per-session AI feedback panel, and Reset Password button (calls `reset-student-password` edge function)
-- **Question Manager** — inline panel per passage in `PassageManager`; add/delete MCQs (3–5 per passage, DB-enforced by trigger)
+- **Passage editing** — Edit button on each passage card in `PassageManager` pre-fills the form; submit runs UPDATE and recalculates `word_count`
+- **Question Manager** — inline panel per passage in `PassageManager`; add/edit/delete MCQs (3–5 per passage, DB-enforced by trigger); edit pre-fills the form and stays accessible even at the 5-question limit
 
 ### Shared components / lib
 - `src/components/PerformanceCharts.jsx` — exports `MetricCard` (sparkline card with Latest/Best/Change stats); used in both `StudentProgress` and `StudentDetail`
@@ -172,6 +173,9 @@ After a reading session, if the passage has questions attached:
 - `src/lib/streak.js` — exports `computeStreak(sessions, today)` → number; school days (Mon–Fri) only, IST timezone
 - `src/lib/costUtils.js` — exports `computeSessionCost({ whisper_duration_seconds, llm_input_tokens, llm_output_tokens })` → USD or null; `formatCost(usd)` → `"$0.0042"` or `"—"`. Pricing: Whisper $0.006/min, GPT-4o-mini $0.15/$0.60 per 1M tokens
 - `src/lib/edgeFunctionError.js` — exports `extractEdgeFunctionError(fnError)`; reads JSON body from `fnError.context.json()` and returns `body.error`, falling back to `fnError.message`. Use this instead of `data?.error` because `data` is always `null` for non-2xx edge function responses
+- `src/lib/weeklySummary.js` — exports `getWeekKey(date)`, `shouldShowWeeklySummary(studentId)`, `markWeeklySummaryShown(studentId)`, `computeWeeklySummaryData(sessions, today)`. Week boundary is Mon–Sun IST. localStorage-backed.
+- `src/components/WeeklySummaryModal.jsx` — overlay modal for weekly summary; props: `data`, `streak`, `onDismiss`
+- `src/components/Pagination.jsx` — shared pagination control; exports `PAGE_SIZE = 5` (named) and the component (default); props: `page`, `total`, `onPrev`, `onNext`, `testIdPrefix` (optional); renders nothing when `total ≤ PAGE_SIZE`
 
 ### Auth & routing
 - `AuthContext` holds both the Supabase `user` and app `profile` (from `profiles` table). Always use `profile` for role/grade — never `user.user_metadata` in components.
@@ -182,7 +186,7 @@ After a reading session, if the passage has questions attached:
 
 ### Database schema (key points)
 - `profiles` — `role` is `teacher` or `student`; `grade` is `text` (`'9'`–`'12'` or `'MBA'`, null for teachers); migration 009 changed this from `int`
-- `passages` — `word_count` computed client-side on insert in `PassageManager`; `grade_level` is `text` (`'9'`–`'12'` or `'MBA'`, nullable for all-grades passages); migration 009 changed this from `int`
+- `passages` — `word_count` computed client-side on insert/edit in `PassageManager`; `grade_level` is `text` (`'9'`–`'12'` or `'MBA'`, nullable for all-grades passages); migration 009 changed this from `int`; `difficulty` is `text` (`'easy'` | `'moderate'` | `'hard'`, default `'easy'`, CHECK constraint enforced) added in migration 011; constraint made idempotent in migration 012
 - `sessions` — `word_results` JSONB `[{ word, spoken, status }]`, status ∈ `correct | substitution | omission`; also stores `score_accuracy`, `score_wpm`, `score_phrasing`, `score_fluency` (same as phrasing, kept for compat), `count_omissions`, `count_substitutions`, `feedback` (JSON string or plain text), `score_comprehension` (int nullable), `comprehension_answers` (jsonb nullable — `[{ question_id, selected_index, is_correct }]`), `whisper_duration_seconds` (numeric nullable), `llm_input_tokens` (int nullable), `llm_output_tokens` (int nullable) — the last three are null for sessions recorded before migration 010
 - `questions` — `passage_id` FK, `question_text`, `options` (jsonb array of 4 strings), `correct_index` (0–3), `display_order`; max 5 per passage enforced by DB trigger `enforce_question_limit`
 - `app_settings` — single-row table (`id boolean PK default true`), holds `ai_feedback_enabled boolean`, `class_code text` (random 6-char code set on migration; teacher shares with students for self-registration), `daily_session_limit int` (default 5; teacher adjusts via dashboard stepper, clamped 1–20)
@@ -235,6 +239,9 @@ Key product and architecture decisions captured here so future sessions don't re
 | CSV bulk import | Client-side parse (native FileReader + split); validation preview before import; same edge function as single-add (array payload) | No library needed for simple CSV; previewing errors before import prevents surprises |
 | Teacher resets student password | `reset-student-password` edge function; guards against resetting non-student accounts | Requires service role; guard prevents a teacher accidentally resetting another teacher's password |
 | OpenAI cost tracking | Store raw metrics (`whisper_duration_seconds`, `llm_input_tokens`, `llm_output_tokens`); compute cost in JS at render time | Raw metrics survive pricing changes; `costUtils.js` is the single place to update rates |
+| Weekly summary trigger | localStorage (key per student ID) not server-side column | No migration needed; acceptable risk of reset on browser clear; simpler than a DB column for low-stakes feature |
+| Assigned passages pagination | 5 per page, client-side slice of already-fetched array | No extra DB queries; all passages already fetched on load; 5 fits comfortably on a phone screen |
+| Recent sessions storage | Store all sessions in state (was capped at 10) | Needed for correct pagination; sessions array is small (students rarely exceed 100 total) |
 
 ### Adding teacher accounts (manual process)
 ```sql

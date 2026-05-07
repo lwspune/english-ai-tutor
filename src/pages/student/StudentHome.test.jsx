@@ -14,8 +14,16 @@ vi.mock('../../lib/AuthContext', () => ({
   }),
 }))
 
+vi.mock('../../components/BottomNav', () => ({
+  default: () => <div data-testid="bottom-nav" />,
+}))
+
+const { mockComputeStreak } = vi.hoisted(() => ({
+  mockComputeStreak: vi.fn(() => 0),
+}))
+
 vi.mock('../../lib/streak', () => ({
-  computeStreak: () => 0,
+  computeStreak: (...args) => mockComputeStreak(...args),
 }))
 
 vi.mock('../../lib/weeklySummary', () => ({
@@ -85,10 +93,113 @@ vi.mock('../../lib/supabase', () => {
 beforeEach(() => {
   mockPassagesOr.mockClear()
   mockNavigate.mockReset()
+  mockComputeStreak.mockReturnValue(0)
   passagesRef.data = [GRADE_10_PASSAGE, ALL_GRADES_PASSAGE]
   sessionsRef.data = []
   localStorage.clear()
 })
+
+// ─── Next Up hero card ────────────────────────────────────────────────────────
+
+describe('StudentHome — Next Up hero card', () => {
+  it('shows the first todo passage as Next Up', async () => {
+    passagesRef.data = [GRADE_10_PASSAGE, ALL_GRADES_PASSAGE]
+    sessionsRef.data = []
+    render(<StudentHome />)
+    await waitFor(() => screen.getByText('Next Up'))
+    expect(screen.getByText('Grade 10 Passage')).toBeInTheDocument()
+  })
+
+  it('shows a retry passage when todo is empty', async () => {
+    const passage = { id: 'rp1', title: 'Retry Passage', word_count: 100, grade_level: 10, difficulty: 'easy' }
+    const session = {
+      id: 'rs1', passage_id: 'rp1', score_accuracy: 60, score_wpm: 120,
+      created_at: new Date(2026, 3, 1).toISOString(), passages: { title: 'Retry Passage' },
+    }
+    passagesRef.data = [passage]
+    sessionsRef.data = [session]
+    render(<StudentHome />)
+    await waitFor(() => screen.getByText('Keep Practising'))
+    expect(screen.getByText('Retry Passage')).toBeInTheDocument()
+  })
+
+  it('does not show Next Up when daily limit is reached', async () => {
+    const todayIST = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
+    sessionsRef.data = Array.from({ length: 5 }, (_, i) => ({
+      id: `ts${i}`, passage_id: `other${i}`, score_accuracy: 80, score_wpm: 140,
+      created_at: new Date(`${todayIST}T10:00:00+05:30`).toISOString(),
+      passages: { title: `Other ${i}` },
+    }))
+    passagesRef.data = [GRADE_10_PASSAGE]
+    render(<StudentHome />)
+    await waitFor(() => screen.getByText(/daily limit reached/i))
+    expect(screen.queryByText('Next Up')).not.toBeInTheDocument()
+    expect(screen.queryByText('Keep Practising')).not.toBeInTheDocument()
+  })
+
+  it('does not show Next Up when all passages are mastered', async () => {
+    const passage = { id: 'mp1', title: 'Mastered Passage', word_count: 100, grade_level: 10, difficulty: 'easy' }
+    const session = {
+      id: 'ms1', passage_id: 'mp1', score_accuracy: 85, score_wpm: 150,
+      created_at: new Date(2026, 3, 1).toISOString(), passages: { title: 'Mastered Passage' },
+    }
+    passagesRef.data = [passage]
+    sessionsRef.data = [session]
+    render(<StudentHome />)
+    await waitFor(() => screen.queryByText('Next Up') === null)
+    expect(screen.queryByText('Next Up')).not.toBeInTheDocument()
+  })
+})
+
+// ─── Status bar ───────────────────────────────────────────────────────────────
+
+describe('StudentHome — status bar', () => {
+  it('shows streak count when streak is greater than 0', async () => {
+    mockComputeStreak.mockReturnValue(5)
+    render(<StudentHome />)
+    await waitFor(() => screen.getByText(/5-day streak/i))
+  })
+
+  it('shows today count chip', async () => {
+    render(<StudentHome />)
+    await waitFor(() => screen.getByText(/0\/5 today/i))
+  })
+})
+
+// ─── Tabs ─────────────────────────────────────────────────────────────────────
+
+describe('StudentHome — tabs', () => {
+  it('shows To Read tab as active by default', async () => {
+    render(<StudentHome />)
+    await waitFor(() => screen.getByRole('button', { name: /to read/i }))
+    expect(screen.getByRole('button', { name: /to read/i })).toBeInTheDocument()
+  })
+
+  it('clicking Practise tab shows retry passages', async () => {
+    const passage = { id: 'rp1', title: 'Retry Passage', word_count: 100, grade_level: 10, difficulty: 'easy' }
+    const session = {
+      id: 'rs1', passage_id: 'rp1', score_accuracy: 60, score_wpm: 120,
+      created_at: new Date(2026, 3, 1).toISOString(), passages: { title: 'Retry Passage' },
+    }
+    passagesRef.data = [passage]
+    sessionsRef.data = [session]
+    render(<StudentHome />)
+    await waitFor(() => screen.getByRole('button', { name: /practise/i }))
+    fireEvent.click(screen.getByRole('button', { name: /practise/i }))
+    expect(document.querySelector('[data-testid="retry-row"]')).toBeInTheDocument()
+  })
+
+  it('clicking History tab shows recent sessions', async () => {
+    sessionsRef.data = [makeSession(0)]
+    render(<StudentHome />)
+    await waitFor(() => screen.getByRole('button', { name: /history/i }))
+    fireEvent.click(screen.getByRole('button', { name: /history/i }))
+    await waitFor(() => document.querySelector('[data-testid="session-row"]'))
+    expect(document.querySelector('[data-testid="session-row"]')).toBeInTheDocument()
+  })
+})
+
+// ─── Difficulty badge ─────────────────────────────────────────────────────────
 
 describe('StudentHome — difficulty badge', () => {
   it('shows the difficulty label on a todo passage card', async () => {
@@ -104,6 +215,8 @@ describe('StudentHome — difficulty badge', () => {
   })
 })
 
+// ─── Grade filter ─────────────────────────────────────────────────────────────
+
 describe('StudentHome — grade filter', () => {
   it('queries passages with a grade filter matching the student grade', async () => {
     render(<StudentHome />)
@@ -117,6 +230,8 @@ describe('StudentHome — grade filter', () => {
     expect(screen.getByText('All Grades Passage')).toBeInTheDocument()
   })
 })
+
+// ─── Assigned passages pagination (To Read tab — default) ────────────────────
 
 describe('StudentHome — assigned passages pagination', () => {
   it('shows at most 5 passages on the first page', async () => {
@@ -146,8 +261,9 @@ describe('StudentHome — assigned passages pagination', () => {
     render(<StudentHome />)
     await waitFor(() => screen.getByText('Passage 0'))
     fireEvent.click(screen.getByRole('button', { name: /next/i }))
+    // Hero hides on page > 0; displayTodo = Passages 1-6, page 1 = Passage 6 only
     expect(screen.queryByText('Passage 0')).not.toBeInTheDocument()
-    expect(screen.getByText('Passage 5')).toBeInTheDocument()
+    expect(screen.queryByText('Passage 1')).not.toBeInTheDocument()
     expect(screen.getByText('Passage 6')).toBeInTheDocument()
   })
 
@@ -168,6 +284,8 @@ describe('StudentHome — assigned passages pagination', () => {
   })
 })
 
+// ─── Keep Practising pagination (Practise tab) ────────────────────────────────
+
 describe('StudentHome — keep practising pagination', () => {
   function makeRetrySetup(count) {
     const passages = Array.from({ length: count }, (_, i) => ({
@@ -180,11 +298,17 @@ describe('StudentHome — keep practising pagination', () => {
     return { passages, sessions }
   }
 
+  async function openPractiseTab() {
+    await waitFor(() => screen.getByRole('button', { name: /practise/i }))
+    fireEvent.click(screen.getByRole('button', { name: /practise/i }))
+  }
+
   it('shows at most 5 retry passages on the first page', async () => {
     const { passages, sessions } = makeRetrySetup(8)
     passagesRef.data = passages
     sessionsRef.data = sessions
     render(<StudentHome />)
+    await openPractiseTab()
     await waitFor(() => document.querySelector('[data-testid="retry-row"]'))
     expect(document.querySelectorAll('[data-testid="retry-row"]')).toHaveLength(5)
   })
@@ -194,8 +318,9 @@ describe('StudentHome — keep practising pagination', () => {
     passagesRef.data = passages
     sessionsRef.data = sessions
     render(<StudentHome />)
+    await openPractiseTab()
     await waitFor(() => document.querySelector('[data-testid="retry-row"]'))
-    expect(screen.queryByRole('button', { name: /next/i })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('retry-next')).not.toBeInTheDocument()
   })
 
   it('shows Next button when more than 5 retry passages', async () => {
@@ -203,6 +328,7 @@ describe('StudentHome — keep practising pagination', () => {
     passagesRef.data = passages
     sessionsRef.data = sessions
     render(<StudentHome />)
+    await openPractiseTab()
     await waitFor(() => document.querySelector('[data-testid="retry-row"]'))
     expect(screen.getByTestId('retry-next')).toBeInTheDocument()
   })
@@ -212,48 +338,52 @@ describe('StudentHome — keep practising pagination', () => {
     passagesRef.data = passages
     sessionsRef.data = sessions
     render(<StudentHome />)
+    await openPractiseTab()
     await waitFor(() => document.querySelector('[data-testid="retry-row"]'))
     fireEvent.click(screen.getByTestId('retry-next'))
     expect(document.querySelectorAll('[data-testid="retry-row"]')).toHaveLength(2)
   })
 })
 
+// ─── Recent sessions pagination (History tab) ─────────────────────────────────
+
 describe('StudentHome — recent sessions pagination', () => {
+  async function openHistoryTab() {
+    await waitFor(() => screen.getByRole('button', { name: /history/i }))
+    fireEvent.click(screen.getByRole('button', { name: /history/i }))
+  }
+
   it('shows at most 5 sessions on the first page', async () => {
     sessionsRef.data = Array.from({ length: 8 }, (_, i) => makeSession(i))
     render(<StudentHome />)
-    await waitFor(() => screen.getByText('Passage 0'))
-    const sessionItems = screen.getAllByText(/^Passage \d+$/).filter(
-      el => el.closest('[data-testid="session-row"]')
-    )
-    // There should be exactly 5 visible session rows
-    const sessionRows = document.querySelectorAll('[data-testid="session-row"]')
-    expect(sessionRows).toHaveLength(5)
+    await openHistoryTab()
+    await waitFor(() => document.querySelector('[data-testid="session-row"]'))
+    expect(document.querySelectorAll('[data-testid="session-row"]')).toHaveLength(5)
   })
 
   it('does not show sessions Next button when 5 or fewer sessions', async () => {
     sessionsRef.data = Array.from({ length: 3 }, (_, i) => makeSession(i))
     render(<StudentHome />)
-    await waitFor(() => screen.getByText('Passage 0'))
-    // Only one Next button should be absent (none at all since passages are also ≤5)
-    expect(screen.queryAllByRole('button', { name: /next/i })).toHaveLength(0)
+    await openHistoryTab()
+    await waitFor(() => document.querySelector('[data-testid="session-row"]'))
+    expect(screen.queryByTestId('sessions-next')).not.toBeInTheDocument()
   })
 
   it('shows page indicator for sessions when paginated', async () => {
     sessionsRef.data = Array.from({ length: 8 }, (_, i) => makeSession(i))
     render(<StudentHome />)
-    await waitFor(() => screen.getByText('Passage 0'))
+    await openHistoryTab()
+    await waitFor(() => document.querySelector('[data-testid="session-row"]'))
     expect(screen.getByTestId('sessions-page-indicator')).toBeInTheDocument()
   })
 
   it('clicking sessions Next shows the next page', async () => {
     sessionsRef.data = Array.from({ length: 8 }, (_, i) => makeSession(i))
     render(<StudentHome />)
-    await waitFor(() => screen.getByText('Passage 0'))
-    const sessionRows0 = document.querySelectorAll('[data-testid="session-row"]')
-    expect(sessionRows0).toHaveLength(5)
+    await openHistoryTab()
+    await waitFor(() => document.querySelector('[data-testid="session-row"]'))
+    expect(document.querySelectorAll('[data-testid="session-row"]')).toHaveLength(5)
     fireEvent.click(screen.getByTestId('sessions-next'))
-    const sessionRows1 = document.querySelectorAll('[data-testid="session-row"]')
-    expect(sessionRows1).toHaveLength(3) // 8 total, 5 on first page, 3 on second
+    expect(document.querySelectorAll('[data-testid="session-row"]')).toHaveLength(3)
   })
 })

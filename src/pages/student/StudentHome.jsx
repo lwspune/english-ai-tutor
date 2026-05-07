@@ -7,6 +7,26 @@ import { computeStreak } from '../../lib/streak'
 import { shouldShowWeeklySummary, markWeeklySummaryShown, computeWeeklySummaryData } from '../../lib/weeklySummary'
 import WeeklySummaryModal from '../../components/WeeklySummaryModal'
 import Pagination, { PAGE_SIZE } from '../../components/Pagination'
+import BottomNav from '../../components/BottomNav'
+
+function passageMeta(p) {
+  const grade = p.grade_level === 'MBA' ? 'MBA' : p.grade_level ? `Grade ${p.grade_level}` : 'All grades'
+  const diff = p.difficulty ?? 'Easy'
+  return `${grade} · ${diff}`
+}
+
+function TabButton({ id, label, active, onClick }) {
+  return (
+    <button
+      onClick={() => onClick(id)}
+      className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+        active ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'
+      }`}
+    >
+      {label}
+    </button>
+  )
+}
 
 export default function StudentHome() {
   const { profile, signOut } = useAuth()
@@ -15,7 +35,6 @@ export default function StudentHome() {
   const [retry, setRetry] = useState([])
   const [sessions, setSessions] = useState([])
   const [streak, setStreak] = useState(0)
-  const [hasReadToday, setHasReadToday] = useState(false)
   const [todayCount, setTodayCount] = useState(0)
   const [dailyLimit, setDailyLimit] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -23,6 +42,7 @@ export default function StudentHome() {
   const [todoPage, setTodoPage] = useState(0)
   const [retryPage, setRetryPage] = useState(0)
   const [sessionsPage, setSessionsPage] = useState(0)
+  const [tab, setTab] = useState('todo')
 
   useEffect(() => {
     async function load() {
@@ -37,11 +57,9 @@ export default function StudentHome() {
       const countToday = allSessions.filter(
         s => new Date(s.created_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }) === todayStr
       ).length
-      const currentStreak = computeStreak(allSessions)
       setTodo(todo)
       setRetry(retry)
-      setStreak(currentStreak)
-      setHasReadToday(countToday > 0)
+      setStreak(computeStreak(allSessions))
       setTodayCount(countToday)
       setDailyLimit(settings?.daily_session_limit ?? 5)
       setSessions(allSessions)
@@ -61,170 +79,185 @@ export default function StudentHome() {
     setWeeklySummary(null)
   }
 
-  const pagedTodo = todo.slice(todoPage * PAGE_SIZE, (todoPage + 1) * PAGE_SIZE)
-  const pagedRetry = retry.slice(retryPage * PAGE_SIZE, (retryPage + 1) * PAGE_SIZE)
+  const dailyLimitReached = dailyLimit !== null && todayCount >= dailyLimit
+  const nextUp = dailyLimitReached
+    ? null
+    : todo.length > 0
+    ? { passage: todo[0], type: 'todo' }
+    : retry.length > 0
+    ? { passage: retry[0], type: 'retry' }
+    : null
+
+  // Exclude the hero passage from the To Read list (it's already featured prominently above).
+  // The hero hides when the user pages past the first page, so Passage 0 re-enters view there.
+  const displayTodo = nextUp?.type === 'todo' ? todo.slice(1) : todo
+  const displayRetry = retry
+  const pagedTodo = displayTodo.slice(todoPage * PAGE_SIZE, (todoPage + 1) * PAGE_SIZE)
+  const pagedRetry = displayRetry.slice(retryPage * PAGE_SIZE, (retryPage + 1) * PAGE_SIZE)
   const pagedSessions = sessions.slice(sessionsPage * PAGE_SIZE, (sessionsPage + 1) * PAGE_SIZE)
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-50 pb-20">
       {weeklySummary && (
         <WeeklySummaryModal data={weeklySummary} streak={streak} onDismiss={dismissWeeklySummary} />
       )}
-      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-gray-800">English AI Tutor</h1>
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-600">{profile.full_name}</span>
-          <button onClick={signOut} className="text-sm text-gray-500 hover:text-gray-800">Sign out</button>
-        </div>
+
+      <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between">
+        <h1 className="text-base font-semibold text-slate-800">English AI Tutor</h1>
+        <button onClick={signOut} className="text-xs text-slate-400 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 rounded">
+          Sign out
+        </button>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-        <button
-          onClick={() => navigate('/student/progress')}
-          className="w-full bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center justify-between text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-          aria-label="View my progress"
-        >
-          <div>
-            <p className="text-sm font-semibold text-blue-700">My Progress</p>
-            <p className="text-xs text-blue-400 mt-0.5">View your reading trends over time</p>
-          </div>
-          <span className="text-blue-400 text-lg" aria-hidden="true">→</span>
-        </button>
-
-        {streak > 0 && (
-          <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold text-orange-700">
-                {streak}-day streak
-              </p>
-              <p className="text-xs text-orange-400 mt-0.5">
-                {hasReadToday ? 'Session done for today — keep it going tomorrow' : 'Read a passage today to keep your streak'}
-              </p>
-            </div>
-            <span className="text-3xl font-bold text-orange-200">{streak}</span>
-          </div>
-        )}
-
-        {dailyLimit !== null && (
-          <div className={`rounded-xl border px-4 py-3 flex items-center justify-between ${
-            todayCount >= dailyLimit
-              ? 'bg-red-50 border-red-200'
-              : 'bg-gray-50 border-gray-200'
-          }`}>
-            <p className={`text-sm font-medium ${todayCount >= dailyLimit ? 'text-red-600' : 'text-gray-600'}`}>
-              {todayCount >= dailyLimit
-                ? `Daily limit reached — come back tomorrow`
-                : `${todayCount} of ${dailyLimit} passages read today`}
-            </p>
-            <span className={`text-sm font-bold ${todayCount >= dailyLimit ? 'text-red-300' : 'text-gray-300'}`}>
-              {todayCount}/{dailyLimit}
+      <main className="max-w-2xl mx-auto px-4 py-4 space-y-4">
+        {!loading && (
+          <div className="flex items-center gap-2">
+            {streak > 0 && (
+              <span className="text-xs font-semibold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full">
+                🔥 {streak}-day streak
+              </span>
+            )}
+            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ml-auto ${
+              dailyLimitReached ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-500'
+            }`}>
+              {dailyLimitReached ? 'Daily limit reached' : `${todayCount}/${dailyLimit} today`}
             </span>
           </div>
         )}
 
-        <section>
-          <h2 className="text-base font-semibold text-gray-700 mb-3">Assigned Passages</h2>
-          {loading ? (
-            <p className="text-sm text-gray-400">Loading...</p>
-          ) : todo.length === 0 && retry.length === 0 ? (
-            <p className="text-sm text-gray-400">No passages assigned yet.</p>
-          ) : (
-            <>
-              <div className="space-y-2">
-                {pagedTodo.map(p => (
-                  <div key={p.id} className="bg-white rounded-xl border border-gray-200 px-4 py-3 flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-800">{p.title}</p>
-                      <p className="text-xs text-gray-400">{p.word_count} words · {p.grade_level === 'MBA' ? 'MBA' : `Grade ${p.grade_level}`} · {p.difficulty ?? 'Easy'}</p>
-                    </div>
-                    <button
-                      onClick={() => navigate(`/student/session/${p.id}`)}
-                      className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                    >
-                      Start Reading
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <Pagination
-                page={todoPage}
-                total={todo.length}
-                onPrev={() => setTodoPage(p => p - 1)}
-                onNext={() => setTodoPage(p => p + 1)}
-              />
-            </>
-          )}
-        </section>
+        {!loading && nextUp && (nextUp.type !== 'todo' || todoPage === 0) && (
+          <div className="bg-indigo-600 rounded-2xl shadow-md p-5">
+            <p className="text-xs font-semibold text-indigo-200 uppercase tracking-wide mb-1">
+              {nextUp.type === 'todo' ? 'Next Up' : 'Keep Practising'}
+            </p>
+            <h2 className="text-lg font-bold text-white mb-1">{nextUp.passage.title}</h2>
+            <p className="text-xs text-indigo-200 mb-4">{passageMeta(nextUp.passage)}</p>
+            <button
+              onClick={() => navigate(`/student/session/${nextUp.passage.id}`)}
+              className="w-full bg-white text-indigo-600 font-semibold text-sm py-2 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            >
+              {nextUp.type === 'todo' ? 'Read Now' : 'Retry Now'}
+            </button>
+          </div>
+        )}
 
-        {retry.length > 0 && (
+        {!loading && (
+          <div className="flex bg-slate-100 rounded-xl p-1 gap-1">
+            <TabButton id="todo" label="To Read" active={tab === 'todo'} onClick={setTab} />
+            <TabButton id="retry" label="Practise" active={tab === 'retry'} onClick={setTab} />
+            <TabButton id="history" label="History" active={tab === 'history'} onClick={setTab} />
+          </div>
+        )}
+
+        {!loading && tab === 'todo' && (
           <section>
-            <h2 className="text-base font-semibold text-gray-700 mb-1">Keep Practising</h2>
-            <p className="text-xs text-gray-400 mb-3">You haven't mastered these yet. Give them another go.</p>
-            <div className="space-y-2">
-              {pagedRetry.map(p => (
-                <div key={p.id} data-testid="retry-row" className="bg-amber-50 rounded-xl border border-amber-200 px-4 py-3 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">{p.title}</p>
-                    <p className="text-xs text-gray-500">
-                      {p.difficulty ?? 'Easy'} · Best score: <span className="font-semibold text-amber-700">{p.bestScore}%</span>
-                      {' · '}{3 - p.attemptsUsed} attempt{3 - p.attemptsUsed !== 1 ? 's' : ''} left
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => navigate(`/student/session/${p.id}`)}
-                    className="bg-amber-500 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-amber-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
-                  >
-                    Retry
-                  </button>
+            {displayTodo.length === 0 ? (
+              <p className="text-sm text-slate-400 text-center py-8">No passages assigned yet.</p>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  {pagedTodo.map(p => (
+                    <div key={p.id} className="bg-white rounded-xl shadow-sm px-4 py-3 flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-slate-800">{p.title}</p>
+                        <p className="text-xs text-slate-400">{p.word_count} words · {passageMeta(p)}</p>
+                      </div>
+                      <button
+                        onClick={() => navigate(`/student/session/${p.id}`)}
+                        className="bg-indigo-600 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-indigo-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                      >
+                        Start Reading
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-            <Pagination
-              page={retryPage}
-              total={retry.length}
-              onPrev={() => setRetryPage(p => p - 1)}
-              onNext={() => setRetryPage(p => p + 1)}
-              testIdPrefix="retry"
-            />
+                <Pagination
+                  page={todoPage}
+                  total={displayTodo.length}
+                  onPrev={() => setTodoPage(p => p - 1)}
+                  onNext={() => setTodoPage(p => p + 1)}
+                />
+              </>
+            )}
           </section>
         )}
 
-        <section>
-          <h2 className="text-base font-semibold text-gray-700 mb-3">Recent Sessions</h2>
-          {sessions.length === 0 ? (
-            <p className="text-sm text-gray-400">No sessions yet.</p>
-          ) : (
-            <>
-              <div className="space-y-2">
-                {pagedSessions.map(s => (
-                  <div
-                    key={s.id}
-                    data-testid="session-row"
-                    onClick={() => navigate(`/student/report/${s.id}`)}
-                    className="bg-white rounded-xl border border-gray-200 px-4 py-3 flex items-center justify-between cursor-pointer hover:border-blue-300 transition-colors"
-                  >
-                    <div>
-                      <p className="text-sm font-medium text-gray-800">{s.passages?.title}</p>
-                      <p className="text-xs text-gray-400">{new Date(s.created_at).toLocaleDateString()}</p>
+        {!loading && tab === 'retry' && (
+          <section>
+            {displayRetry.length === 0 ? (
+              <p className="text-sm text-slate-400 text-center py-8">Nothing to practise — great work!</p>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  {pagedRetry.map(p => (
+                    <div key={p.id} data-testid="retry-row" className="bg-amber-50 rounded-xl shadow-sm px-4 py-3 flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-slate-800">{p.title}</p>
+                        <p className="text-xs text-slate-500">
+                          Best: <span className="font-semibold text-amber-700">{p.bestScore}%</span>
+                          {' · '}{3 - p.attemptsUsed} attempt{3 - p.attemptsUsed !== 1 ? 's' : ''} left
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => navigate(`/student/session/${p.id}`)}
+                        className="bg-amber-500 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-amber-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                      >
+                        Retry
+                      </button>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-semibold text-blue-600">{s.score_accuracy}%</p>
-                      <p className="text-xs text-gray-400">{s.score_wpm} WPM</p>
+                  ))}
+                </div>
+                <Pagination
+                  page={retryPage}
+                  total={displayRetry.length}
+                  onPrev={() => setRetryPage(p => p - 1)}
+                  onNext={() => setRetryPage(p => p + 1)}
+                  testIdPrefix="retry"
+                />
+              </>
+            )}
+          </section>
+        )}
+
+        {!loading && tab === 'history' && (
+          <section>
+            {sessions.length === 0 ? (
+              <p className="text-sm text-slate-400 text-center py-8">No sessions yet.</p>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  {pagedSessions.map(s => (
+                    <div
+                      key={s.id}
+                      data-testid="session-row"
+                      onClick={() => navigate(`/student/report/${s.id}`)}
+                      className="bg-white rounded-xl shadow-sm px-4 py-3 flex items-center justify-between cursor-pointer hover:shadow-md transition-shadow"
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-slate-800">{s.passages?.title}</p>
+                        <p className="text-xs text-slate-400">{new Date(s.created_at).toLocaleDateString()}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-semibold text-indigo-600">{s.score_accuracy}%</p>
+                        <p className="text-xs text-slate-400">{s.score_wpm} WPM</p>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-              <Pagination
-                page={sessionsPage}
-                total={sessions.length}
-                onPrev={() => setSessionsPage(p => p - 1)}
-                onNext={() => setSessionsPage(p => p + 1)}
-                testIdPrefix="sessions"
-              />
-            </>
-          )}
-        </section>
+                  ))}
+                </div>
+                <Pagination
+                  page={sessionsPage}
+                  total={sessions.length}
+                  onPrev={() => setSessionsPage(p => p - 1)}
+                  onNext={() => setSessionsPage(p => p + 1)}
+                  testIdPrefix="sessions"
+                />
+              </>
+            )}
+          </section>
+        )}
       </main>
+
+      <BottomNav />
     </div>
   )
 }

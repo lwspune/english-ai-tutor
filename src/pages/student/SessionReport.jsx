@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { WPM_TARGETS } from '../../lib/wpmTargets'
 
 function ComprehensionResults({ questions, answers }) {
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-4">
-      <h3 className="text-sm font-semibold text-gray-700">Comprehension Results</h3>
+    <div className="bg-white rounded-2xl shadow-sm p-5 space-y-4">
+      <h3 className="text-sm font-semibold text-slate-700">Comprehension Results</h3>
       {questions
         .slice()
         .sort((a, b) => a.display_order - b.display_order)
@@ -13,15 +14,15 @@ function ComprehensionResults({ questions, answers }) {
           const ans = answers.find(a => a.question_id === q.id)
           return (
             <div key={q.id}>
-              <p className="text-sm font-medium text-gray-800 mb-2">
-                <span className="text-gray-400 mr-1">{qi + 1}.</span>
-                <span>{q.question_text}</span>
+              <p className="text-sm font-medium text-slate-800 mb-2">
+                <span className="text-slate-400 mr-1">{qi + 1}.</span>
+                {q.question_text}
               </p>
               <div className="space-y-1">
                 {q.options.map((opt, oi) => {
                   const isCorrect = oi === q.correct_index
                   const isSelected = ans?.selected_index === oi
-                  let cls = 'text-gray-500'
+                  let cls = 'text-slate-400'
                   if (isSelected && isCorrect) cls = 'text-green-700 font-semibold'
                   else if (isSelected && !isCorrect) cls = 'text-red-600 font-semibold'
                   else if (isCorrect) cls = 'text-green-600'
@@ -40,23 +41,21 @@ function ComprehensionResults({ questions, answers }) {
   )
 }
 
-const WPM_TARGETS = { 9: 140, 10: 150, 11: 160, 12: 170, MBA: 180 }
-
 function FeedbackCard({ raw }) {
   let ai = null
   try { ai = JSON.parse(raw) } catch { /* plain text fallback */ }
 
   if (ai && ai.wentWell) {
     return (
-      <div className="bg-blue-50 rounded-2xl border border-blue-100 p-5 space-y-3">
-        <h3 className="text-sm font-semibold text-blue-800">Feedback</h3>
+      <div className="bg-indigo-50 rounded-2xl p-5 space-y-3">
+        <h3 className="text-sm font-semibold text-indigo-800">Feedback</h3>
         <div>
           <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-1">What went well</p>
-          <p className="text-sm text-gray-700 leading-relaxed">{ai.wentWell}</p>
+          <p className="text-sm text-slate-700 leading-relaxed">{ai.wentWell}</p>
         </div>
         <div>
           <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-1">Focus on</p>
-          <p className="text-sm text-gray-700 leading-relaxed">{ai.focusOn}</p>
+          <p className="text-sm text-slate-700 leading-relaxed">{ai.focusOn}</p>
         </div>
         {ai.practiseWords?.length > 0 && (
           <div>
@@ -68,31 +67,30 @@ function FeedbackCard({ raw }) {
             </div>
           </div>
         )}
-        <div className="pt-1 border-t border-blue-100">
-          <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-1">Tip for next time</p>
-          <p className="text-sm text-blue-700 leading-relaxed">{ai.tip}</p>
+        <div className="pt-1 border-t border-indigo-100">
+          <p className="text-xs font-semibold text-indigo-700 uppercase tracking-wide mb-1">Tip for next time</p>
+          <p className="text-sm text-indigo-700 leading-relaxed">{ai.tip}</p>
         </div>
       </div>
     )
   }
 
-  // plain text fallback (rule-based or old sessions)
   return (
-    <div className="bg-blue-50 rounded-2xl border border-blue-100 p-5">
-      <h3 className="text-sm font-semibold text-blue-800 mb-2">Feedback</h3>
-      <p className="text-sm text-blue-700 leading-relaxed">{raw}</p>
+    <div className="bg-indigo-50 rounded-2xl p-5">
+      <h3 className="text-sm font-semibold text-indigo-800 mb-2">Feedback</h3>
+      <p className="text-sm text-indigo-700 leading-relaxed">{raw}</p>
     </div>
   )
 }
 
-function ScoreRing({ value, label, color, sub }) {
+function MetricRing({ value, label, colorClass, sub }) {
   return (
-    <div className="flex flex-col items-center gap-1">
-      <div className={`w-20 h-20 rounded-full border-4 ${color} flex items-center justify-center`}>
-        <span className="text-xl font-bold text-gray-800">{value}</span>
+    <div className="flex-1 flex flex-col items-center gap-1 min-w-0">
+      <div className={`w-16 h-16 rounded-full border-4 ${colorClass} flex items-center justify-center`}>
+        <span className="text-sm font-bold text-slate-800 leading-none">{value}</span>
       </div>
-      <span className="text-xs text-gray-500">{label}</span>
-      {sub && <span className="text-xs text-gray-400">{sub}</span>}
+      <span className="text-xs text-slate-500 text-center">{label}</span>
+      {sub && <span className="text-xs text-slate-400 text-center leading-tight">{sub}</span>}
     </div>
   )
 }
@@ -142,8 +140,8 @@ export default function SessionReport() {
 
   if (!session) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
@@ -152,26 +150,32 @@ export default function SessionReport() {
   const wpmTarget = WPM_TARGETS[grade] ?? 150
   const wpmDiff = session.score_wpm - wpmTarget
   const wpmSub = wpmDiff >= 0
-    ? `+${wpmDiff} above target`
-    : `${Math.abs(wpmDiff)} below target (${wpmTarget})`
-  const wpmColor = Math.abs(wpmDiff) <= 15 ? 'border-green-500' : wpmDiff < 0 ? 'border-yellow-500' : 'border-blue-500'
-
+    ? `+${wpmDiff} vs target`
+    : `${Math.abs(wpmDiff)} below target`
+  const wpmColor = Math.abs(wpmDiff) <= 15 ? 'border-green-500' : wpmDiff < 0 ? 'border-amber-400' : 'border-blue-500'
   const omissions = session.count_omissions ?? words.filter(w => w.status === 'omission').length
   const substitutions = session.count_substitutions ?? words.filter(w => w.status === 'substitution').length
   const phrasing = session.score_phrasing ?? session.score_fluency ?? 0
+  const isNewBest = personalBest && (personalBest.newAccuracy || personalBest.newWpm)
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
-        <button onClick={() => navigate('/student')} className="text-gray-500 hover:text-gray-800 text-sm">← Back</button>
-        <h1 className="text-base font-semibold text-gray-800">Session Report</h1>
+    <div className="min-h-screen bg-slate-50">
+      <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3">
+        <button
+          onClick={() => navigate('/student')}
+          className="text-slate-500 hover:text-slate-800 text-sm min-h-[44px] flex items-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 rounded"
+        >
+          ← Back
+        </button>
+        <h1 className="text-base font-semibold text-slate-800">Session Report</h1>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-        {personalBest && (personalBest.newAccuracy || personalBest.newWpm) && (
-          <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3">
-            <p className="text-sm font-semibold text-green-700">New personal best!</p>
-            <p className="text-xs text-green-600 mt-0.5">
+      <main className="max-w-2xl mx-auto px-4 py-4 space-y-4">
+        {/* Personal best banner */}
+        {isNewBest && (
+          <div className="bg-green-500 rounded-2xl px-5 py-4 text-white">
+            <p className="text-base font-bold">New personal best!</p>
+            <p className="text-sm text-green-100 mt-0.5">
               {[
                 personalBest.newAccuracy && `Accuracy: ${session.score_accuracy}% (was ${personalBest.prevBestAccuracy}%)`,
                 personalBest.newWpm && `WPM: ${session.score_wpm} (was ${personalBest.prevBestWpm})`,
@@ -179,64 +183,63 @@ export default function SessionReport() {
             </p>
           </div>
         )}
-        {personalBest && !personalBest.newAccuracy && !personalBest.newWpm && (
-          <p className="text-xs text-gray-400 px-1">
-            Your best on this passage — Accuracy: {personalBest.prevBestAccuracy}% · WPM: {personalBest.prevBestWpm}
+        {personalBest && !isNewBest && (
+          <p className="text-xs text-slate-400 px-1">
+            Your best on this passage — {personalBest.prevBestAccuracy}% accuracy · {personalBest.prevBestWpm} WPM
           </p>
         )}
 
-        {/* Scores */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-5">
-          <p className="text-xs text-gray-400 mb-1">{new Date(session.created_at).toLocaleString()}</p>
-          <h2 className="text-base font-semibold text-gray-800 mb-5">{session.passages.title}</h2>
-
-          <div className="flex justify-around flex-wrap gap-4">
-            <ScoreRing
-              value={`${session.score_accuracy}%`}
-              label="Accuracy"
-              color="border-blue-500"
-            />
-            <ScoreRing
-              value={session.score_wpm}
-              label="Pace (WPM)"
-              color={wpmColor}
-              sub={wpmSub}
-            />
-            <ScoreRing
-              value={`${phrasing}%`}
-              label="Phrasing"
-              color="border-purple-500"
-            />
-            {session.score_comprehension != null && (
-              <ScoreRing
-                value={`${session.score_comprehension}%`}
-                label="Comprehension"
-                color="border-teal-500"
-              />
-            )}
-          </div>
-
-          {/* Error summary */}
-          <div className="mt-5 flex justify-center gap-6 text-sm text-gray-600">
-            <span>
-              <span className="font-semibold text-red-500">{omissions}</span> skipped
-            </span>
-            <span>
-              <span className="font-semibold text-amber-500">{substitutions}</span> substituted
-            </span>
+        {/* Accuracy hero */}
+        <div className="bg-white rounded-2xl shadow-sm p-6 flex flex-col items-center text-center">
+          <p className="text-xs text-slate-400 mb-1">{new Date(session.created_at).toLocaleString()}</p>
+          <h2 className="text-base font-semibold text-slate-700 mb-3">{session.passages.title}</h2>
+          <p className="text-7xl font-bold text-indigo-600 leading-none mb-1">{session.score_accuracy}%</p>
+          <p className="text-xs text-slate-400 mb-5">Accuracy</p>
+          <div className="flex gap-6 text-sm text-slate-600">
+            <span><span className="font-bold text-red-500">{omissions}</span> skipped</span>
+            <span><span className="font-bold text-amber-500">{substitutions}</span> substituted</span>
           </div>
         </div>
 
+        {/* Secondary metrics */}
+        <div className="flex gap-3">
+          <MetricRing value={session.score_wpm} label="Pace (WPM)" colorClass={wpmColor} sub={wpmSub} />
+          <MetricRing value={`${phrasing}%`} label="Phrasing" colorClass="border-purple-400" />
+          {session.score_comprehension != null && (
+            <MetricRing value={`${session.score_comprehension}%`} label="Comprehension" colorClass="border-teal-400" />
+          )}
+        </div>
+
+        {/* Feedback */}
+        {session.feedback && <FeedbackCard raw={session.feedback} />}
+
+        {/* Comprehension CTA */}
+        {questions.length > 0 && session.comprehension_answers == null && (
+          <div className="bg-white rounded-2xl shadow-sm p-5 flex flex-col items-center gap-3 text-center">
+            <p className="text-sm text-slate-600">Ready to test your understanding?</p>
+            <button
+              onClick={() => navigate(`/student/comprehension/${sessionId}`)}
+              className="bg-indigo-600 text-white px-6 py-3 rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors min-h-[44px] w-full sm:w-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+            >
+              Answer Comprehension Questions
+            </button>
+          </div>
+        )}
+
+        {questions.length > 0 && session.comprehension_answers != null && (
+          <ComprehensionResults questions={questions} answers={session.comprehension_answers} />
+        )}
+
         {/* Word-by-word */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-5">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Word-by-Word Analysis</h3>
+        <div className="bg-white rounded-2xl shadow-sm p-5">
+          <h3 className="text-sm font-semibold text-slate-700 mb-3">Word-by-Word</h3>
           <div className="flex flex-wrap gap-1.5">
             {words.map((result, i) => {
               const colorClass =
-                result.status === 'correct'       ? 'bg-green-100 text-green-800' :
-                result.status === 'substitution'  ? 'bg-amber-100 text-amber-800' :
-                result.status === 'omission'      ? 'bg-red-100 text-red-800'
-                                                  : 'bg-gray-100 text-gray-600'
+                result.status === 'correct'      ? 'bg-green-100 text-green-800' :
+                result.status === 'substitution' ? 'bg-amber-100 text-amber-800' :
+                result.status === 'omission'     ? 'bg-red-100 text-red-800'
+                                                 : 'bg-slate-100 text-slate-600'
               const title = result.status === 'substitution' && result.spoken
                 ? `Said: "${result.spoken}"`
                 : undefined
@@ -251,35 +254,12 @@ export default function SessionReport() {
               )
             })}
           </div>
-          <div className="flex gap-4 mt-4 text-xs text-gray-500">
+          <div className="flex gap-4 mt-4 text-xs text-slate-500">
             <span><span className="inline-block w-3 h-3 rounded bg-green-200 mr-1" />Correct</span>
             <span><span className="inline-block w-3 h-3 rounded bg-amber-200 mr-1" />Substituted</span>
             <span><span className="inline-block w-3 h-3 rounded bg-red-200 mr-1" />Skipped</span>
           </div>
         </div>
-
-        {/* Feedback */}
-        {session.feedback && <FeedbackCard raw={session.feedback} />}
-
-        {/* Comprehension */}
-        {questions.length > 0 && session.comprehension_answers == null && (
-          <div className="bg-white rounded-2xl border border-gray-200 p-5 flex flex-col items-center gap-3 text-center">
-            <p className="text-sm text-gray-600">Ready to test your understanding?</p>
-            <button
-              onClick={() => navigate(`/student/comprehension/${sessionId}`)}
-              className="bg-teal-600 text-white px-6 py-3 rounded-xl text-sm font-semibold hover:bg-teal-700 transition-colors min-h-[44px] w-full sm:w-auto"
-            >
-              Answer Comprehension Questions
-            </button>
-          </div>
-        )}
-
-        {questions.length > 0 && session.comprehension_answers != null && (
-          <ComprehensionResults
-            questions={questions}
-            answers={session.comprehension_answers}
-          />
-        )}
       </main>
     </div>
   )

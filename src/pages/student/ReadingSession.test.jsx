@@ -12,12 +12,13 @@ vi.mock('../../lib/AuthContext', () => ({
   useAuth: () => ({ profile: { id: 'student-1', grade: 10 } }),
 }))
 
+const { mockRecorderState } = vi.hoisted(() => ({
+  mockRecorderState: { recording: false, audioBlob: null, autoStopped: false, remaining: 180 },
+}))
+
 vi.mock('../../hooks/useAudioRecorder', () => ({
   useAudioRecorder: () => ({
-    recording: false,
-    audioBlob: null,
-    autoStopped: false,
-    remaining: 180,
+    ...mockRecorderState,
     startRecording: vi.fn(),
     stopRecording: vi.fn(),
     reset: vi.fn(),
@@ -56,11 +57,10 @@ vi.mock('../../lib/supabase', () => ({
       }
       if (table === 'sessions') {
         return {
-          // select is called with count options; first .eq is always student_id
           select: () => ({
             eq: () => ({
-              eq: () => Promise.resolve({ count: mockCounts.attempt }), // per-passage attempts
-              gte: () => Promise.resolve({ count: mockCounts.today }),  // today's sessions
+              eq: () => Promise.resolve({ count: mockCounts.attempt }),
+              gte: () => Promise.resolve({ count: mockCounts.today }),
             }),
           }),
         }
@@ -72,17 +72,22 @@ vi.mock('../../lib/supabase', () => ({
   },
 }))
 
-describe('ReadingSession — daily limit', () => {
-  beforeEach(() => {
-    mockNavigate.mockReset()
-    mockCounts.attempt = 0
-    mockCounts.today = 0
-    mockCounts.dailyLimit = 5
-  })
+beforeEach(() => {
+  mockNavigate.mockReset()
+  mockCounts.attempt = 0
+  mockCounts.today = 0
+  mockCounts.dailyLimit = 5
+  mockRecorderState.recording = false
+  mockRecorderState.audioBlob = null
+  mockRecorderState.autoStopped = false
+  mockRecorderState.remaining = 180
+})
 
+// ─── Daily limit ──────────────────────────────────────────────────────────────
+
+describe('ReadingSession — daily limit', () => {
   it('enables Start Recording when under daily limit', async () => {
     mockCounts.today = 2
-    mockCounts.dailyLimit = 5
     render(<ReadingSession />)
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /start recording/i })).not.toBeDisabled()
@@ -91,7 +96,6 @@ describe('ReadingSession — daily limit', () => {
 
   it('disables Start Recording when daily limit is reached', async () => {
     mockCounts.today = 5
-    mockCounts.dailyLimit = 5
     render(<ReadingSession />)
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /start recording/i })).toBeDisabled()
@@ -100,7 +104,6 @@ describe('ReadingSession — daily limit', () => {
 
   it('shows daily limit message when limit is reached', async () => {
     mockCounts.today = 5
-    mockCounts.dailyLimit = 5
     render(<ReadingSession />)
     await waitFor(() => {
       expect(screen.getByText(/today's limit of 5 passages/i)).toBeInTheDocument()
@@ -109,10 +112,40 @@ describe('ReadingSession — daily limit', () => {
 
   it('does not show daily limit message when under limit', async () => {
     mockCounts.today = 3
-    mockCounts.dailyLimit = 5
     render(<ReadingSession />)
     await waitFor(() => {
       expect(screen.queryByText(/today's limit/i)).not.toBeInTheDocument()
     })
+  })
+})
+
+// ─── Recording indicator ──────────────────────────────────────────────────────
+
+describe('ReadingSession — recording indicator', () => {
+  it('shows a pulsing recording indicator when recording', async () => {
+    mockRecorderState.recording = true
+    render(<ReadingSession />)
+    await waitFor(() => screen.getByTestId('recording-pulse'))
+  })
+
+  it('shows timer countdown when recording', async () => {
+    mockRecorderState.recording = true
+    mockRecorderState.remaining = 180
+    render(<ReadingSession />)
+    await waitFor(() => screen.getByText('3:00'))
+  })
+
+  it('shows timer in red when 30 seconds or fewer remain', async () => {
+    mockRecorderState.recording = true
+    mockRecorderState.remaining = 25
+    render(<ReadingSession />)
+    await waitFor(() => screen.getByText('0:25'))
+    expect(screen.getByText('0:25').className).toMatch(/red/)
+  })
+
+  it('does not show recording indicator when not recording', async () => {
+    render(<ReadingSession />)
+    await waitFor(() => screen.getByRole('button', { name: /start recording/i }))
+    expect(screen.queryByTestId('recording-pulse')).not.toBeInTheDocument()
   })
 })

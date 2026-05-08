@@ -71,47 +71,61 @@ export default function ReadingSession() {
 
   if (!passage) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
-        <button onClick={() => navigate('/student')} className="text-gray-500 hover:text-gray-800 text-sm">← Back</button>
-        <h1 className="text-base font-semibold text-gray-800">{passage.title}</h1>
+    <div className="min-h-screen bg-slate-50">
+      <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3">
+        <button
+          onClick={() => navigate('/student')}
+          className="text-slate-500 hover:text-slate-800 text-sm min-h-[44px] flex items-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 rounded"
+        >
+          ← Back
+        </button>
+        <h1 className="text-base font-semibold text-slate-800">{passage.title}</h1>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-        <div className="bg-white rounded-2xl border border-gray-200 p-6">
-          <p className="text-gray-800 leading-relaxed text-lg">{passage.content}</p>
+      <main className="max-w-2xl mx-auto px-4 py-4 space-y-4">
+        <div className="bg-white rounded-2xl shadow-sm p-6">
+          <p className="text-slate-800 leading-relaxed text-lg">{passage.content}</p>
         </div>
 
-        <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-4">
+        <div className="bg-white rounded-2xl shadow-sm p-5 space-y-4">
           {dailyLimitReached && (
             <p className="text-xs text-center font-medium text-red-500">
               You've reached today's limit of {dailyLimit} passages. Come back tomorrow.
             </p>
           )}
           {!dailyLimitReached && attemptCount !== null && (
-            <p className={`text-xs text-center font-medium ${attemptCount >= 3 ? 'text-red-500' : 'text-gray-400'}`}>
+            <p className={`text-xs text-center font-medium ${attemptCount >= 3 ? 'text-red-500' : 'text-slate-400'}`}>
               {attemptCount >= 3
                 ? 'You have used all 3 attempts for this passage.'
                 : `Attempt ${attemptCount + 1} of 3`}
             </p>
           )}
-          <p className="text-sm font-medium text-gray-700 text-center">
-            {recording
-              ? `Recording... read the passage aloud`
-              : autoStopped ? 'Recording stopped — 3 minute limit reached'
-              : audioBlob ? 'Recording complete'
-              : 'Press Start when ready to read'}
-          </p>
+
           {recording && (
-            <p className={`text-xs text-center ${remaining <= 30 ? 'text-red-500 font-semibold' : 'text-gray-400'}`}>
-              {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')} remaining
+            <div className="flex flex-col items-center gap-2">
+              <span
+                data-testid="recording-pulse"
+                className="w-4 h-4 bg-red-500 rounded-full animate-pulse"
+              />
+              <p className={`text-3xl font-bold tabular-nums ${remaining <= 30 ? 'text-red-500' : 'text-slate-700'}`}>
+                {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')}
+              </p>
+              <p className="text-xs text-slate-400">Recording — read the passage aloud</p>
+            </div>
+          )}
+
+          {!recording && (
+            <p className="text-sm font-medium text-slate-600 text-center">
+              {autoStopped ? 'Recording stopped — time limit reached'
+                : audioBlob ? 'Recording complete'
+                : 'Press Start when ready to read'}
             </p>
           )}
 
@@ -120,7 +134,7 @@ export default function ReadingSession() {
               <button
                 onClick={startRecording}
                 disabled={attemptCount >= 3 || dailyLimitReached}
-                className="bg-red-500 text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-red-600 transition-colors flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="bg-red-500 text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-red-600 transition-colors flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]"
               >
                 <span className="w-2 h-2 bg-white rounded-full" />
                 Start Recording
@@ -129,7 +143,7 @@ export default function ReadingSession() {
             {recording && (
               <button
                 onClick={stopRecording}
-                className="bg-gray-800 text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-900 transition-colors"
+                className="bg-slate-800 text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-slate-900 transition-colors min-h-[44px]"
               >
                 Stop Recording
               </button>
@@ -138,21 +152,21 @@ export default function ReadingSession() {
               <>
                 <button
                   onClick={reset}
-                  className="border border-gray-300 text-gray-700 px-5 py-2.5 rounded-full text-sm font-medium hover:bg-gray-50 transition-colors"
+                  className="border border-slate-200 text-slate-700 px-5 py-2.5 rounded-full text-sm font-medium hover:bg-slate-50 transition-colors min-h-[44px]"
                 >
                   Re-record
                 </button>
                 <button
                   onClick={handleSubmit}
-                  className="bg-blue-600 text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-blue-700 transition-colors"
+                  className="bg-indigo-600 text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-indigo-700 transition-colors min-h-[44px]"
                 >
                   Submit
                 </button>
               </>
             )}
             {submitting && (
-              <div className="flex items-center gap-2 text-sm text-gray-500">
-                <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+              <div className="flex items-center gap-2 text-sm text-slate-500">
+                <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
                 Analysing your reading...
               </div>
             )}

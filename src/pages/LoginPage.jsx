@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabase'
 
+const RESET_URL = 'https://english-ai-tutor-mauve.vercel.app/reset-password'
+
 export default function LoginPage() {
   const { signIn } = useAuth()
   const navigate = useNavigate()
@@ -23,10 +25,25 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
+  // forgot password state
+  const [forgotEmail, setForgotEmail] = useState('')
+  const [forgotSent, setForgotSent] = useState(false)
+  const [forgotLoading, setForgotLoading] = useState(false)
+
   function switchMode(next) {
     setMode(next)
     setError('')
     setSignupDone(false)
+    setForgotSent(false)
+    setForgotEmail('')
+  }
+
+  async function handleForgotPassword(e) {
+    e.preventDefault()
+    setForgotLoading(true)
+    await supabase.auth.resetPasswordForEmail(forgotEmail, { redirectTo: RESET_URL })
+    setForgotLoading(false)
+    setForgotSent(true)
   }
 
   async function handleSignIn(e) {
@@ -94,7 +111,55 @@ export default function LoginPage() {
           </div>
         )}
 
-        {mode === 'signin' ? (
+        {mode === 'forgot' ? (
+          forgotSent ? (
+            <div className="text-center space-y-3">
+              <p className="text-green-700 bg-green-50 rounded-lg px-4 py-3 text-sm">
+                Check your inbox — we've sent a reset link to your email.
+              </p>
+              <button
+                onClick={() => switchMode('signin')}
+                className="text-indigo-600 text-sm hover:underline focus-visible:outline-none focus-visible:underline"
+              >
+                Back to sign in
+              </button>
+            </div>
+          ) : (
+            <div>
+              <h2 className="text-base font-semibold text-slate-800 mb-1">Forgot password</h2>
+              <p className="text-sm text-slate-500 mb-4">Enter your email and we'll send you a reset link.</p>
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <div>
+                  <label htmlFor="forgot-email" className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                  <input
+                    id="forgot-email"
+                    type="email"
+                    value={forgotEmail}
+                    onChange={e => setForgotEmail(e.target.value)}
+                    required
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                    placeholder="you@school.com"
+                    aria-label="Email"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={forgotLoading}
+                  className="w-full bg-indigo-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                >
+                  {forgotLoading ? 'Sending…' : 'Send reset link'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => switchMode('signin')}
+                  className="w-full text-sm text-slate-500 hover:text-slate-700 focus-visible:outline-none focus-visible:underline"
+                >
+                  Back to sign in
+                </button>
+              </form>
+            </div>
+          )
+        ) : mode === 'signin' ? (
           <form onSubmit={handleSignIn} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
@@ -124,6 +189,13 @@ export default function LoginPage() {
               className="w-full bg-indigo-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors min-h-[44px]"
             >
               {loading ? 'Signing in…' : 'Sign In'}
+            </button>
+            <button
+              type="button"
+              onClick={() => switchMode('forgot')}
+              className="w-full text-sm text-slate-500 hover:text-slate-700 focus-visible:outline-none focus-visible:underline"
+            >
+              Forgot password?
             </button>
           </form>
         ) : signupDone ? (

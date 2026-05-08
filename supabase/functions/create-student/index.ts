@@ -121,7 +121,12 @@ Deno.serve(async (req) => {
       })
 
       if (error) {
-        results.push({ email: s.email, success: false, error: error.message || error.toString() || 'Failed to create user' })
+        console.error('createUser error for', s.email, JSON.stringify(error))
+        const errMsg = error.message || error.code || JSON.stringify(error) || 'Failed to create user'
+        results.push({ email: s.email, success: false, error: errMsg })
+      } else if (!data?.user?.id) {
+        console.error('createUser returned no user for', s.email, JSON.stringify(data))
+        results.push({ email: s.email, success: false, error: 'createUser returned no user' })
       } else {
         results.push({ email: s.email, success: true, id: data.user.id })
         emailQueue.push({ name: s.full_name.trim(), email: s.email, password: s.password })

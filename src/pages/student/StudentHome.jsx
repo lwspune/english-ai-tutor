@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/AuthContext'
 import { classifyPassages } from '../../lib/passageClassifier'
+import { sortByDifficulty } from '../../lib/passageOrder'
 import { computeStreak } from '../../lib/streak'
 import { shouldShowWeeklySummary, markWeeklySummaryShown, computeWeeklySummaryData } from '../../lib/weeklySummary'
 import WeeklySummaryModal from '../../components/WeeklySummaryModal'
@@ -52,7 +53,8 @@ export default function StudentHome() {
         supabase.from('app_settings').select('daily_session_limit').single(),
       ])
       const allSessions = s ?? []
-      const { todo, retry } = classifyPassages(p ?? [], allSessions)
+      const orderedPassages = sortByDifficulty(p ?? [])
+      const { todo, retry } = classifyPassages(orderedPassages, allSessions)
       const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
       const countToday = allSessions.filter(
         s => new Date(s.created_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }) === todayStr

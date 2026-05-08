@@ -215,6 +215,52 @@ describe('StudentHome — difficulty badge', () => {
   })
 })
 
+// ─── Difficulty ordering ─────────────────────────────────────────────────────
+
+describe('StudentHome — difficulty ordering', () => {
+  const HARD = { id: 'ph', title: 'Hard Passage',     word_count: 100, grade_level: 10, difficulty: 'hard',     created_at: new Date(2026, 0, 1).toISOString() }
+  const EASY = { id: 'pe', title: 'Easy Passage',     word_count: 100, grade_level: 10, difficulty: 'easy',     created_at: new Date(2026, 0, 1).toISOString() }
+  const MOD  = { id: 'pm', title: 'Moderate Passage', word_count: 100, grade_level: 10, difficulty: 'moderate', created_at: new Date(2026, 0, 1).toISOString() }
+
+  it('shows the easiest unfinished passage as Next Up', async () => {
+    passagesRef.data = [HARD, MOD, EASY]
+    sessionsRef.data = []
+    render(<StudentHome />)
+    await waitFor(() => screen.getByText('Next Up'))
+    // Hero card should feature the Easy passage, not Hard or Moderate.
+    const hero = screen.getByText('Next Up').closest('div')
+    expect(hero).toHaveTextContent('Easy Passage')
+  })
+
+  it('renders the To Read list in easy → moderate → hard order', async () => {
+    passagesRef.data = [HARD, MOD, EASY]
+    sessionsRef.data = []
+    render(<StudentHome />)
+    await waitFor(() => screen.getByText('Hard Passage'))
+    // Easy is featured in the hero, so the To Read list shows Moderate then Hard.
+    const titles = screen.getAllByRole('button', { name: /start reading/i })
+      .map(btn => btn.closest('div').querySelector('p.font-medium').textContent)
+    expect(titles).toEqual(['Moderate Passage', 'Hard Passage'])
+  })
+
+  it('breaks ties within the same difficulty by created_at ascending (oldest first)', async () => {
+    const e1 = { id: 'e1', title: 'Easy Old',    word_count: 100, grade_level: 10, difficulty: 'easy', created_at: new Date(2026, 0, 1).toISOString() }
+    const e2 = { id: 'e2', title: 'Easy Newer',  word_count: 100, grade_level: 10, difficulty: 'easy', created_at: new Date(2026, 2, 1).toISOString() }
+    const e3 = { id: 'e3', title: 'Easy Newest', word_count: 100, grade_level: 10, difficulty: 'easy', created_at: new Date(2026, 4, 1).toISOString() }
+    passagesRef.data = [e3, e1, e2]
+    sessionsRef.data = []
+    render(<StudentHome />)
+    await waitFor(() => screen.getByText('Next Up'))
+    // Oldest easy passage should be the hero.
+    const hero = screen.getByText('Next Up').closest('div')
+    expect(hero).toHaveTextContent('Easy Old')
+    // To Read list (excluding hero) shows the next two oldest in order.
+    const titles = screen.getAllByRole('button', { name: /start reading/i })
+      .map(btn => btn.closest('div').querySelector('p.font-medium').textContent)
+    expect(titles).toEqual(['Easy Newer', 'Easy Newest'])
+  })
+})
+
 // ─── Grade filter ─────────────────────────────────────────────────────────────
 
 describe('StudentHome — grade filter', () => {

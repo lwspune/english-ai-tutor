@@ -35,6 +35,42 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
+describe('LoginPage — tagline and onboarding context', () => {
+  it('renders a tagline below the title', () => {
+    renderPage()
+    expect(screen.getByText(/read aloud\. get ai feedback\. improve faster\./i)).toBeInTheDocument()
+  })
+
+  it('does not show the class code helper hint on the Sign In tab', () => {
+    renderPage()
+    expect(screen.queryByText(/ask your teacher for your class code/i)).not.toBeInTheDocument()
+  })
+
+  it('shows the class code helper hint on the Sign Up tab', () => {
+    renderPage()
+    fireEvent.click(screen.getByRole('button', { name: /sign up/i }))
+    expect(screen.getByText(/ask your teacher for your class code/i)).toBeInTheDocument()
+  })
+
+  it('shows a "How does this work?" disclosure that is collapsed by default', () => {
+    renderPage()
+    const summary = screen.getByText(/how does this work\?/i)
+    expect(summary).toBeInTheDocument()
+    // Native <details> open attribute reflects state
+    expect(summary.closest('details')).not.toHaveAttribute('open')
+  })
+
+  it('expands the disclosure to reveal three steps when clicked', () => {
+    renderPage()
+    const summary = screen.getByText(/how does this work\?/i)
+    fireEvent.click(summary)
+    expect(summary.closest('details')).toHaveAttribute('open')
+    expect(screen.getByText(/pick a passage/i)).toBeInTheDocument()
+    expect(screen.getByText(/read it aloud/i)).toBeInTheDocument()
+    expect(screen.getByText(/instant feedback/i)).toBeInTheDocument()
+  })
+})
+
 describe('LoginPage — forgot password', () => {
   it('shows a Forgot password link in sign-in mode', () => {
     renderPage()

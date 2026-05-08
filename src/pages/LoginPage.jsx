@@ -86,9 +86,12 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-md p-8 w-full max-w-sm">
-        <h1 className="text-2xl font-bold text-slate-800 mb-2 text-center">English AI Tutor</h1>
+        <h1 className="text-2xl font-bold text-slate-800 mb-1 text-center">English AI Tutor</h1>
+        <p className="text-sm text-slate-500 text-center mb-6">
+          Read aloud. Get AI feedback. Improve faster.
+        </p>
 
         {/* Mode tabs */}
         <div className="flex rounded-lg bg-slate-100 p-1 mb-6">
@@ -260,6 +263,9 @@ export default function LoginPage() {
                 <option value="MBA">MBA</option>
               </select>
             </div>
+            <div className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-600">
+              Ask your teacher for your class code. It's usually 6 characters.
+            </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Class Code</label>
               <input
@@ -282,6 +288,17 @@ export default function LoginPage() {
           </form>
         )}
       </div>
+
+      <details className="w-full max-w-sm mt-4 text-sm text-slate-500">
+        <summary className="cursor-pointer text-center hover:text-slate-700 focus-visible:outline-none focus-visible:underline">
+          How does this work?
+        </summary>
+        <ol className="mt-3 space-y-2 bg-white rounded-xl border border-slate-200 px-5 py-4 list-decimal list-inside text-slate-600">
+          <li>Pick a passage from your teacher's list.</li>
+          <li>Read it aloud — we'll record you.</li>
+          <li>Get instant feedback on accuracy, pace, and phrasing.</li>
+        </ol>
+      </details>
     </div>
   )
 }

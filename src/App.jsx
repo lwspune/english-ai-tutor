@@ -11,6 +11,7 @@ import TeacherDashboard from './pages/teacher/TeacherDashboard'
 import PassageManager from './pages/teacher/PassageManager'
 import StudentDetail from './pages/teacher/StudentDetail'
 import PassageCompletion from './pages/teacher/PassageCompletion'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 
 function RootRedirect() {
   const { profile, loading } = useAuth()
@@ -26,6 +27,7 @@ export default function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/" element={<ProtectedRoute><RootRedirect /></ProtectedRoute>} />
 
           <Route path="/student" element={<ProtectedRoute role="student"><StudentHome /></ProtectedRoute>} />

@@ -68,33 +68,33 @@ function SingleTab({ onClose }) {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label htmlFor="single-name" className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+        <label htmlFor="single-name" className="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
         <input
           id="single-name"
           type="text"
           value={form.full_name}
           onChange={set('full_name')}
           required
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
           placeholder="Student full name"
         />
       </div>
 
       <div>
-        <label htmlFor="single-email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+        <label htmlFor="single-email" className="block text-sm font-medium text-slate-700 mb-1">Email</label>
         <input
           id="single-email"
           type="email"
           value={form.email}
           onChange={set('email')}
           required
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
           placeholder="student@school.com"
         />
       </div>
 
       <div>
-        <label htmlFor="single-password" className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+        <label htmlFor="single-password" className="block text-sm font-medium text-slate-700 mb-1">Password</label>
         <div className="relative">
           <input
             id="single-password"
@@ -103,13 +103,13 @@ function SingleTab({ onClose }) {
             onChange={set('password')}
             required
             minLength={8}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm pr-16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm pr-16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
             placeholder="Min 8 characters"
           />
           <button
             type="button"
             onClick={() => setShowPassword(v => !v)}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500 hover:text-gray-700 focus-visible:outline-none focus-visible:underline"
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-500 hover:text-slate-700 focus-visible:outline-none focus-visible:underline"
             aria-label={showPassword ? 'Hide password' : 'Show password'}
           >
             {showPassword ? 'Hide' : 'Show'}
@@ -118,13 +118,13 @@ function SingleTab({ onClose }) {
       </div>
 
       <div>
-        <label htmlFor="single-grade" className="block text-sm font-medium text-gray-700 mb-1">Grade</label>
+        <label htmlFor="single-grade" className="block text-sm font-medium text-slate-700 mb-1">Grade</label>
         <select
           id="single-grade"
           value={form.grade}
           onChange={set('grade')}
           required
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
         >
           <option value="">Select grade</option>
           {VALID_GRADES.map(g => (
@@ -139,14 +139,14 @@ function SingleTab({ onClose }) {
         <button
           type="button"
           onClick={() => onClose(false)}
-          className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 focus-visible:outline-none focus-visible:underline"
+          className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 focus-visible:outline-none focus-visible:underline"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={submitting}
-          className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          className="px-4 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
         >
           {submitting ? 'Adding…' : 'Add Student'}
         </button>
@@ -201,10 +201,10 @@ function CsvTab({ onClose }) {
   return (
     <div className="space-y-4">
       <div>
-        <label htmlFor="csv-upload" className="block text-sm font-medium text-gray-700 mb-1">
+        <label htmlFor="csv-upload" className="block text-sm font-medium text-slate-700 mb-1">
           Upload CSV
         </label>
-        <p className="text-xs text-gray-400 mb-2">
+        <p className="text-xs text-slate-400 mb-2">
           Required columns (header row): <span className="font-mono">full_name, email, password, grade</span>
         </p>
         <input
@@ -213,27 +213,27 @@ function CsvTab({ onClose }) {
           type="file"
           accept=".csv,text/csv"
           onChange={handleFile}
-          className="block w-full text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+          className="block w-full text-sm text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
         />
       </div>
 
       {rows.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-gray-200">
+        <div className="overflow-x-auto rounded-lg border border-slate-200">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">Name</th>
-                <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">Email</th>
-                <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">Grade</th>
-                <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">Status</th>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <th className="text-left px-3 py-2 text-xs font-semibold text-slate-500">Name</th>
+                <th className="text-left px-3 py-2 text-xs font-semibold text-slate-500">Email</th>
+                <th className="text-left px-3 py-2 text-xs font-semibold text-slate-500">Grade</th>
+                <th className="text-left px-3 py-2 text-xs font-semibold text-slate-500">Status</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row, i) => (
-                <tr key={i} className={`border-b border-gray-100 last:border-0 ${row.errors.length ? 'bg-red-50' : ''}`}>
-                  <td className="px-3 py-2 text-gray-800">{row.full_name || <span className="text-gray-300">—</span>}</td>
-                  <td className="px-3 py-2 text-gray-600 text-xs">{row.email || <span className="text-gray-300">—</span>}</td>
-                  <td className="px-3 py-2 text-gray-600">{row.grade || <span className="text-gray-300">—</span>}</td>
+                <tr key={i} className={`border-b border-slate-100 last:border-0 ${row.errors.length ? 'bg-red-50' : ''}`}>
+                  <td className="px-3 py-2 text-slate-800">{row.full_name || <span className="text-slate-300">—</span>}</td>
+                  <td className="px-3 py-2 text-slate-600 text-xs">{row.email || <span className="text-slate-300">—</span>}</td>
+                  <td className="px-3 py-2 text-slate-600">{row.grade || <span className="text-slate-300">—</span>}</td>
                   <td className="px-3 py-2">
                     {row.errors.length === 0 ? (
                       <span className="text-xs text-green-700 font-medium">Valid</span>
@@ -262,14 +262,14 @@ function CsvTab({ onClose }) {
         <button
           type="button"
           onClick={() => onClose(false)}
-          className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 focus-visible:outline-none focus-visible:underline"
+          className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 focus-visible:outline-none focus-visible:underline"
         >
           Cancel
         </button>
         <button
           onClick={handleImport}
           disabled={validRows.length === 0 || importing}
-          className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          className="px-4 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
         >
           {importing ? 'Importing…' : `Import ${validRows.length} valid row${validRows.length !== 1 ? 's' : ''}`}
         </button>
@@ -301,7 +301,7 @@ export default function AddStudentModal({ onClose }) {
       aria-label="Add student"
     >
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6">
-        <h2 className="text-base font-semibold text-gray-800 mb-4">Add Student</h2>
+        <h2 className="text-base font-semibold text-slate-800 mb-4">Add Student</h2>
 
         {singleSuccess && (
           <div className="mb-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-800 font-medium">
@@ -309,7 +309,7 @@ export default function AddStudentModal({ onClose }) {
           </div>
         )}
 
-        <div role="tablist" className="flex gap-1 mb-5 border-b border-gray-200">
+        <div role="tablist" className="flex gap-1 mb-5 border-b border-slate-200">
           {[
             { id: 'single', label: 'Single' },
             { id: 'csv', label: 'Import CSV' },
@@ -319,10 +319,10 @@ export default function AddStudentModal({ onClose }) {
               role="tab"
               aria-selected={tab === t.id}
               onClick={() => setTab(t.id)}
-              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
                 tab === t.id
-                  ? 'border-blue-600 text-blue-700'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'border-indigo-600 text-indigo-700'
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
               }`}
             >
               {t.label}

@@ -29,7 +29,7 @@ function Sparkline({ values, color, fillColor, referenceY, yMin = 0, yMax = 100 
         <line
           x1={PX} y1={toY(referenceY)}
           x2={W - PX} y2={toY(referenceY)}
-          stroke="#9ca3af" strokeWidth="1.5" strokeDasharray="4,3"
+          stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="4,3"
         />
       )}
       <polygon points={areaPoints} fill={fillColor} />
@@ -51,13 +51,13 @@ export function MetricCard({ label, values, color, fillColor, unit = '%', refere
   const change = values.length >= 2 ? values[values.length - 1] - values[0] : null
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 p-4">
+    <div className="bg-white rounded-2xl border border-slate-200 p-4">
       <div className="mb-1">
-        <h3 className="text-sm font-semibold text-gray-700">{label}</h3>
-        {refLabel && <p className="text-xs text-gray-400 mt-0.5">{refLabel}</p>}
+        <h3 className="text-sm font-semibold text-slate-700">{label}</h3>
+        {refLabel && <p className="text-xs text-slate-400 mt-0.5">{refLabel}</p>}
       </div>
       {values.length === 0 ? (
-        <p className="text-xs text-gray-400 py-6 text-center">No data yet</p>
+        <p className="text-xs text-slate-400 py-6 text-center">No data yet</p>
       ) : (
         <>
           <Sparkline
@@ -68,14 +68,14 @@ export function MetricCard({ label, values, color, fillColor, unit = '%', refere
             yMin={yMin}
             yMax={yMax}
           />
-          <div className="flex justify-between mt-3 pt-3 border-t border-gray-100">
+          <div className="flex justify-between mt-3 pt-3 border-t border-slate-100">
             <div className="text-center">
-              <p className="text-sm font-bold text-gray-800">{latest}{unit}</p>
-              <p className="text-xs text-gray-400">Latest</p>
+              <p className="text-sm font-bold text-slate-800">{latest}{unit}</p>
+              <p className="text-xs text-slate-400">Latest</p>
             </div>
             <div className="text-center">
-              <p className="text-sm font-bold text-gray-800">{best}{unit}</p>
-              <p className="text-xs text-gray-400">Best</p>
+              <p className="text-sm font-bold text-slate-800">{best}{unit}</p>
+              <p className="text-xs text-slate-400">Best</p>
             </div>
             <div className="text-center">
               {change !== null ? (
@@ -83,12 +83,12 @@ export function MetricCard({ label, values, color, fillColor, unit = '%', refere
                   <p className={`text-sm font-bold ${change >= 0 ? 'text-green-600' : 'text-red-500'}`}>
                     {change >= 0 ? '+' : ''}{change}{unit}
                   </p>
-                  <p className="text-xs text-gray-400">Since start</p>
+                  <p className="text-xs text-slate-400">Since start</p>
                 </>
               ) : (
                 <>
-                  <p className="text-sm font-bold text-gray-800">—</p>
-                  <p className="text-xs text-gray-400">Change</p>
+                  <p className="text-sm font-bold text-slate-800">—</p>
+                  <p className="text-xs text-slate-400">Change</p>
                 </>
               )}
             </div>

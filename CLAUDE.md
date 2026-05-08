@@ -147,18 +147,17 @@ After a reading session, if the passage has questions attached:
 - Teacher can reset a student's comprehension attempt via the `reset_comprehension` RPC (button in StudentDetail Comp. column)
 
 ### Student pages
-- `StudentHome` (`/student`) — "Assigned Passages" + "Keep Practising" (amber, <80% mastery, attempts left) + "Recent Sessions"; all three lists paginated at 5 per page via `Pagination`; also shows streak card, daily counter chip (X of N today, red at limit), "My Progress" banner, weekly summary modal (first visit of each new week)
-- `ReadingSession` (`/student/session/:passageId`) — audio recording; Start Recording disabled when per-passage attempt limit (3) OR daily session limit is reached
-- `SessionReport` (`/student/report/:sessionId`) — word-by-word results + feedback + personal best banner (accuracy + WPM vs prior attempts on same passage) + comprehension CTA
+- `StudentHome` (`/student`) — segmented tabs (To Read | Practise | History); hero card highlights next-up passage (indigo-600, "Read Now"/"Retry Now" button); hero excluded from the tab list and hidden when paging past page 1; status bar: streak pill (amber) + daily count chip (red at limit); weekly summary modal on first visit each week. All tab lists paginated at 5 per page via `Pagination`. Fixed `BottomNav` at bottom.
+- `ReadingSession` (`/student/session/:passageId`) — audio recording with animate-pulse red dot + countdown timer during recording; Start Recording disabled when per-passage attempt limit (3) OR daily session limit is reached
+- `SessionReport` (`/student/report/:sessionId`) — accuracy hero (large `text-7xl` %, indigo-600); compact secondary metric rings (WPM, Phrasing, Comprehension); personal best banner (green, full-width) when new record; feedback card (indigo-50); comprehension CTA
 - `ComprehensionQuiz` (`/student/comprehension/:sessionId`) — once-only quiz with confirmation modal
-- `StudentProgress` (`/student/progress`) — sparkline trend charts for Accuracy, Pace, Phrasing, Comprehension
+- `StudentProgress` (`/student/progress`) — sparkline trend charts for Accuracy, Pace, Phrasing, Comprehension; fixed `BottomNav` at bottom
 
 ### Teacher dashboard
-- **AI Feedback toggle** — global on/off button in the header, persisted in `app_settings` table
-- **Daily limit stepper** — −/N/+ control in header (clamped 1–20); updates `app_settings.daily_session_limit` immediately
-- **Class code display** — shown in header with one-tap copy; students use this code to self-register
+- **Header** — two rows: identity row (title + teacher name + sign out) + controls strip (Manage Passages / Passage Completion nav links; class code chip with one-tap copy; daily limit stepper clamped 1–20; AI Feedback toggle — indigo when on, slate when off)
+- **Summary stat chips** — 3 chips above the class table: total Students, total Sessions, class Avg Accuracy; computed client-side from the already-fetched student list (`data-testid`: `stat-students`, `stat-sessions`, `stat-accuracy`)
 - **Add Student button** — opens `AddStudentModal` (two tabs: Single student form / Import CSV); calls `create-student` edge function; refreshes class list on success
-- **Class Performance table** — per-student: sessions, avg accuracy, avg WPM, last session, total OpenAI cost; class total cost shown below table
+- **Class Performance table** — per-student: sessions, avg accuracy, avg WPM, last session, total OpenAI cost; class total cost shown below table; row hover `bg-indigo-50`
 - **Passage Completion** (`/teacher/completion`) — per-passage cards showing count completed + chips for students who haven't read yet; chips link to student detail
 - **Student detail** (`/teacher/student/:id`) — summary stats, sparkline performance trends (Accuracy, Pace, Phrasing, Comprehension), recurring difficult words, session progress table with ↑/↓ trend arrows, per-session OpenAI cost, comprehension Reset button, expandable per-session AI feedback panel, and Reset Password button (calls `reset-student-password` edge function)
 - **Passage editing** — Edit button on each passage card in `PassageManager` pre-fills the form; submit runs UPDATE and recalculates `word_count`
@@ -176,6 +175,7 @@ After a reading session, if the passage has questions attached:
 - `src/lib/weeklySummary.js` — exports `getWeekKey(date)`, `shouldShowWeeklySummary(studentId)`, `markWeeklySummaryShown(studentId)`, `computeWeeklySummaryData(sessions, today)`. Week boundary is Mon–Sun IST. localStorage-backed.
 - `src/components/WeeklySummaryModal.jsx` — overlay modal for weekly summary; props: `data`, `streak`, `onDismiss`
 - `src/components/Pagination.jsx` — shared pagination control; exports `PAGE_SIZE = 5` (named) and the component (default); props: `page`, `total`, `onPrev`, `onNext`, `testIdPrefix` (optional); renders nothing when `total ≤ PAGE_SIZE`
+- `src/components/BottomNav.jsx` — fixed bottom nav for student screens; Home tab (`/student`) + Progress tab (`/student/progress`); `aria-current="page"` on active tab; `min-h-[56px]` touch target; used in `StudentHome` and `StudentProgress`
 
 ### Auth & routing
 - `AuthContext` holds both the Supabase `user` and app `profile` (from `profiles` table). Always use `profile` for role/grade — never `user.user_metadata` in components.
@@ -209,6 +209,7 @@ After a reading session, if the passage has questions attached:
 - **Email confirmation:** If Supabase Auth email confirmation is enabled, students see a "check your email" screen after signup. For school use, consider disabling it (Auth → Settings → disable email confirmations).
 - **Storage RLS:** `storage.objects` has a policy `students can upload audio` allowing authenticated users to upload to their own folder (`{uid}/...`). Service role in the edge function bypasses this for downloads.
 - **Class code:** Set once by migration (random 6-char hex). To change it: `update app_settings set class_code = 'NEWCODE' where id = true;`
+- **Vercel repo visibility:** The repo is public on GitHub. Vercel Hobby plan blocks deployment of commits from non-member collaborators on private repos — making the repo public was the fix. If the repo is ever made private again, all committers must be added as Vercel team members (requires a paid plan).
 - **Creating student accounts:** Use the "Add Student" button on the teacher dashboard (single or CSV bulk). For emergency SQL inserts: use `auth.users` directly with `crypt(password, gen_salt('bf'))` and `raw_user_meta_data: { full_name, role: 'student', grade }` — do NOT use the Supabase dashboard UI as it doesn't set `raw_user_meta_data`.
 
 ### Environment variables
@@ -242,6 +243,11 @@ Key product and architecture decisions captured here so future sessions don't re
 | Weekly summary trigger | localStorage (key per student ID) not server-side column | No migration needed; acceptable risk of reset on browser clear; simpler than a DB column for low-stakes feature |
 | Assigned passages pagination | 5 per page, client-side slice of already-fetched array | No extra DB queries; all passages already fetched on load; 5 fits comfortably on a phone screen |
 | Recent sessions storage | Store all sessions in state (was capped at 10) | Needed for correct pagination; sessions array is small (students rarely exceed 100 total) |
+| UI colour system | `slate-*` for neutrals, `indigo-*` for primary actions; red/green/amber retained as semantic colours | Consistent single palette across all components; gray/blue were mixed inconsistently before |
+| StudentHome layout | Segmented tabs (To Read / Practise / History) + hero card for next-up passage | Hero gives the student a clear single call to action; tabs reduce visual noise vs three stacked lists |
+| TeacherDashboard header | Split identity row + controls strip | Cramped single-row header wrapped on laptop screens; separation makes each group of controls scannable |
+| TeacherDashboard stat chips | 3 summary chips (Students / Sessions / Avg Accuracy) computed from already-fetched student list | Teacher needs a class pulse at a glance before drilling into rows; no extra DB query needed |
+| Colour-only UI changes | No new tests required | Presentational changes carry no behaviour to test; existing tests already verify component renders correctly |
 
 ### Adding teacher accounts (manual process)
 ```sql

@@ -156,3 +156,31 @@ describe('TeacherDashboard — Cost column', () => {
     // Integration: covered by costUtils.test.js.
   })
 })
+
+// ─── Summary stat chips ───────────────────────────────────────────────────────
+
+describe('TeacherDashboard — summary stat chips', () => {
+  it('shows total student count', async () => {
+    render(<TeacherDashboard />)
+    await waitFor(() => screen.getByText('Aarav Shah'))
+    const chip = screen.getByTestId('stat-students')
+    expect(chip).toHaveTextContent('1')
+    expect(chip).toHaveTextContent(/students/i)
+  })
+
+  it('shows total sessions across all students', async () => {
+    render(<TeacherDashboard />)
+    await waitFor(() => screen.getByText('Aarav Shah'))
+    const chip = screen.getByTestId('stat-sessions')
+    expect(chip).toHaveTextContent('2')
+    expect(chip).toHaveTextContent(/sessions/i)
+  })
+
+  it('shows class avg accuracy', async () => {
+    render(<TeacherDashboard />)
+    await waitFor(() => screen.getByText('Aarav Shah'))
+    const chip = screen.getByTestId('stat-accuracy')
+    expect(chip).toHaveTextContent('85%')
+    expect(chip).toHaveTextContent(/avg accuracy/i)
+  })
+})

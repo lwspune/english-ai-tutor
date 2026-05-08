@@ -44,17 +44,17 @@ export default function QuestionPanel({ questions, onSave, onDelete, onUpdate })
         .slice()
         .sort((a, b) => a.display_order - b.display_order)
         .map((q, i) => (
-          <div key={q.id} className="bg-gray-50 rounded-lg border border-gray-200 p-3 text-sm">
+          <div key={q.id} className="bg-slate-50 rounded-lg border border-slate-200 p-3 text-sm">
             <div className="flex items-start justify-between gap-2">
-              <p className="font-medium text-gray-800">
-                <span className="text-gray-400 mr-1">{i + 1}.</span>
+              <p className="font-medium text-slate-800">
+                <span className="text-slate-400 mr-1">{i + 1}.</span>
                 <span>{q.question_text}</span>
               </p>
               <div className="flex gap-3 shrink-0">
                 <button
                   type="button"
                   onClick={() => startEdit(q)}
-                  className="text-xs text-blue-500 hover:text-blue-700"
+                  className="text-xs text-indigo-500 hover:text-indigo-700"
                 >
                   Edit
                 </button>
@@ -71,7 +71,7 @@ export default function QuestionPanel({ questions, onSave, onDelete, onUpdate })
               {q.options.map((opt, j) => (
                 <li
                   key={j}
-                  className={`text-xs px-2 py-1 rounded flex gap-1 ${j === q.correct_index ? 'bg-green-100 text-green-800 font-medium' : 'text-gray-600'}`}
+                  className={`text-xs px-2 py-1 rounded flex gap-1 ${j === q.correct_index ? 'bg-green-100 text-green-800 font-medium' : 'text-slate-600'}`}
                 >
                   <span className="shrink-0">{String.fromCharCode(65 + j)}.</span>
                   <span>{opt}</span>
@@ -86,8 +86,8 @@ export default function QuestionPanel({ questions, onSave, onDelete, onUpdate })
       )}
 
       {showForm && (
-        <form onSubmit={handleSubmit} className="bg-blue-50 rounded-lg border border-blue-200 p-3 space-y-3">
-          <p className="text-xs font-semibold text-blue-800">
+        <form onSubmit={handleSubmit} className="bg-indigo-50 rounded-lg border border-indigo-200 p-3 space-y-3">
+          <p className="text-xs font-semibold text-indigo-800">
             {editingId ? 'Edit Question' : `Add Question (${questions.length}/5)`}
           </p>
           <input
@@ -95,7 +95,7 @@ export default function QuestionPanel({ questions, onSave, onDelete, onUpdate })
             onChange={e => setForm(f => ({ ...f, question_text: e.target.value }))}
             required
             placeholder="Question text"
-            className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="w-full border border-slate-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
           />
           <div className="grid grid-cols-1 gap-2">
             {['A', 'B', 'C', 'D'].map((letter, i) => (
@@ -113,16 +113,16 @@ export default function QuestionPanel({ questions, onSave, onDelete, onUpdate })
                   onChange={e => setOption(i, e.target.value)}
                   required
                   placeholder={`Option ${letter}`}
-                  className="flex-1 border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  className="flex-1 border border-slate-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
                 />
               </div>
             ))}
           </div>
-          <p className="text-xs text-gray-500">Select the radio button next to the correct answer.</p>
+          <p className="text-xs text-slate-500">Select the radio button next to the correct answer.</p>
           <div className="flex gap-2">
             <button
               type="submit"
-              className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors min-h-[44px]"
+              className="bg-indigo-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors min-h-[44px]"
             >
               {editingId ? 'Save Changes' : 'Add Question'}
             </button>
@@ -130,7 +130,7 @@ export default function QuestionPanel({ questions, onSave, onDelete, onUpdate })
               <button
                 type="button"
                 onClick={cancelEdit}
-                className="text-sm px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-100 transition-colors min-h-[44px]"
+                className="text-sm px-4 py-2 rounded-lg border border-slate-300 hover:bg-slate-100 transition-colors min-h-[44px]"
               >
                 Cancel
               </button>

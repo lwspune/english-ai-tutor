@@ -147,15 +147,15 @@ export default function PassageManager() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+    <div className="min-h-screen bg-slate-50">
+      <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/teacher')} className="text-gray-500 hover:text-gray-800 text-sm">← Back</button>
-          <h1 className="text-base font-semibold text-gray-800">Passage Library</h1>
+          <button onClick={() => navigate('/teacher')} className="text-slate-500 hover:text-slate-800 text-sm">← Back</button>
+          <h1 className="text-base font-semibold text-slate-800">Passage Library</h1>
         </div>
         <button
           onClick={showForm ? cancelForm : startAdd}
-          className="bg-blue-600 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-blue-700 transition-colors"
+          className="bg-indigo-600 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-indigo-700 transition-colors"
         >
           {showForm ? 'Cancel' : '+ Add Passage'}
         </button>
@@ -163,52 +163,52 @@ export default function PassageManager() {
 
       <main className="max-w-3xl mx-auto px-4 py-6 space-y-5">
         {showForm && (
-          <form onSubmit={handleSave} className="bg-white rounded-2xl border border-gray-200 p-5 space-y-4">
-            <h2 className="text-sm font-semibold text-gray-700">
+          <form onSubmit={handleSave} className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
+            <h2 className="text-sm font-semibold text-slate-700">
               {editingPassageId ? 'Edit Passage' : 'New Passage'}
             </h2>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Title</label>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Title</label>
               <input
                 value={form.title}
                 onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
                 required
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 placeholder="e.g. The Gift of the Magi"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Passage Text</label>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Passage Text</label>
               <textarea
                 value={form.content}
                 onChange={e => setForm(f => ({ ...f, content: e.target.value }))}
                 required
                 rows={6}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
                 placeholder="Paste passage text here..."
               />
-              <p className="text-xs text-gray-400 mt-1">{form.content.trim() ? form.content.trim().split(/\s+/).length : 0} words</p>
+              <p className="text-xs text-slate-400 mt-1">{form.content.trim() ? form.content.trim().split(/\s+/).length : 0} words</p>
             </div>
             <div className="flex gap-4">
               <div>
-                <label htmlFor="grade-level-select" className="block text-xs font-medium text-gray-600 mb-1">Grade Level</label>
+                <label htmlFor="grade-level-select" className="block text-xs font-medium text-slate-600 mb-1">Grade Level</label>
                 <select
                   id="grade-level-select"
                   value={form.grade_level}
                   onChange={e => setForm(f => ({ ...f, grade_level: e.target.value }))}
-                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
                   {[9, 10, 11, 12].map(g => <option key={g} value={g}>{g}th Grade</option>)}
                   <option value="MBA">MBA</option>
                 </select>
               </div>
               <div>
-                <label htmlFor="difficulty-select" className="block text-xs font-medium text-gray-600 mb-1">Difficulty</label>
+                <label htmlFor="difficulty-select" className="block text-xs font-medium text-slate-600 mb-1">Difficulty</label>
                 <select
                   id="difficulty-select"
                   value={form.difficulty}
                   onChange={e => setForm(f => ({ ...f, difficulty: e.target.value }))}
-                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
                   {Object.entries(DIFFICULTY_LABELS).map(([val, label]) => (
                     <option key={val} value={val}>{label}</option>
@@ -220,14 +220,14 @@ export default function PassageManager() {
               <button
                 type="submit"
                 disabled={saving}
-                className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                className="bg-indigo-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
               >
                 {saving ? 'Saving...' : editingPassageId ? 'Save Changes' : 'Save Passage'}
               </button>
               <button
                 type="button"
                 onClick={cancelForm}
-                className="px-5 py-2 rounded-lg text-sm font-medium border border-gray-300 hover:bg-gray-100 transition-colors"
+                className="px-5 py-2 rounded-lg text-sm font-medium border border-slate-300 hover:bg-slate-100 transition-colors"
               >
                 Cancel
               </button>
@@ -237,23 +237,23 @@ export default function PassageManager() {
 
         <div className="space-y-3">
           {passages.length === 0 ? (
-            <p className="text-sm text-gray-400">No passages yet. Add one above.</p>
+            <p className="text-sm text-slate-400">No passages yet. Add one above.</p>
           ) : passages.map(p => {
             const questions = questionsByPassage[p.id] ?? []
             const isExpanded = expandedPassageId === p.id
             return (
-              <div key={p.id} className="bg-white rounded-xl border border-gray-200 px-4 py-3">
+              <div key={p.id} className="bg-white rounded-xl border border-slate-200 px-4 py-3">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-800">{p.title}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{p.word_count} words · {p.grade_level === 'MBA' ? 'MBA' : `Grade ${p.grade_level}`} · {DIFFICULTY_LABELS[p.difficulty] ?? 'Easy'}</p>
-                    <p className="text-xs text-gray-500 mt-1 line-clamp-2">{p.content}</p>
+                    <p className="text-sm font-medium text-slate-800">{p.title}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">{p.word_count} words · {p.grade_level === 'MBA' ? 'MBA' : `Grade ${p.grade_level}`} · {DIFFICULTY_LABELS[p.difficulty] ?? 'Easy'}</p>
+                    <p className="text-xs text-slate-500 mt-1 line-clamp-2">{p.content}</p>
                   </div>
                   <div className="flex flex-col items-end gap-2 shrink-0">
                     <div className="flex gap-3">
                       <button
                         onClick={() => startEdit(p)}
-                        className="text-xs text-blue-500 hover:text-blue-700"
+                        className="text-xs text-indigo-500 hover:text-indigo-700"
                       >
                         Edit
                       </button>
@@ -266,7 +266,7 @@ export default function PassageManager() {
                     </div>
                     <button
                       onClick={() => toggleQuestions(p.id)}
-                      className="text-xs text-blue-600 hover:text-blue-800 font-medium whitespace-nowrap min-h-[44px] flex items-center"
+                      className="text-xs text-indigo-600 hover:text-indigo-800 font-medium whitespace-nowrap min-h-[44px] flex items-center"
                     >
                       {isExpanded ? 'Hide Questions' : `Questions (${questionCounts[p.id] ?? 0})`}
                     </button>

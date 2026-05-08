@@ -18,7 +18,7 @@ function TrendCell({ value, display, prev, goodDirection = 'up' }) {
   const improving = arrow === '↑' ? goodDirection === 'up' : goodDirection === 'down'
   return (
     <td className="px-3 py-3 text-center">
-      <span className="font-semibold text-gray-800">{display}</span>
+      <span className="font-semibold text-slate-800">{display}</span>
       {arrow && (
         <span className={`ml-1 text-xs font-bold ${improving ? 'text-green-500' : 'text-red-400'}`}>
           {arrow}
@@ -65,7 +65,7 @@ function FeedbackPanel({ raw }) {
       </div>
     )
   }
-  return <p className="text-sm text-gray-700">{raw}</p>
+  return <p className="text-sm text-slate-700">{raw}</p>
 }
 
 function ResetPasswordModal({ studentId, onClose }) {
@@ -96,10 +96,10 @@ function ResetPasswordModal({ studentId, onClose }) {
       aria-modal="true"
     >
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
-        <h2 className="text-base font-semibold text-gray-800 mb-4">Reset Password</h2>
+        <h2 className="text-base font-semibold text-slate-800 mb-4">Reset Password</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="reset-password" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="reset-password" className="block text-sm font-medium text-slate-700 mb-1">
               New Password
             </label>
             <div className="relative">
@@ -110,13 +110,13 @@ function ResetPasswordModal({ studentId, onClose }) {
                 onChange={e => setPassword(e.target.value)}
                 required
                 minLength={8}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm pr-16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm pr-16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
                 placeholder="Min 8 characters"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(v => !v)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500 hover:text-gray-700 focus-visible:outline-none focus-visible:underline"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-500 hover:text-slate-700 focus-visible:outline-none focus-visible:underline"
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
               >
                 {showPassword ? 'Hide' : 'Show'}
@@ -128,14 +128,14 @@ function ResetPasswordModal({ studentId, onClose }) {
             <button
               type="button"
               onClick={() => onClose(false)}
-              className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 focus-visible:outline-none focus-visible:underline"
+              className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 focus-visible:outline-none focus-visible:underline"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              className="px-4 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
             >
               {submitting ? 'Saving…' : 'Confirm'}
             </button>
@@ -173,7 +173,7 @@ export default function StudentDetail() {
   if (!student) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
@@ -206,7 +206,7 @@ export default function StudentDetail() {
   const avgComprehension = computeAvgComprehension(sessions)
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-50">
       {showResetPassword && (
         <ResetPasswordModal
           studentId={studentId}
@@ -217,17 +217,17 @@ export default function StudentDetail() {
         />
       )}
 
-      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 flex-wrap">
-        <button onClick={() => navigate('/teacher')} className="text-gray-500 hover:text-gray-800 text-sm">← Back</button>
-        <h1 className="text-base font-semibold text-gray-800">{student.full_name}</h1>
-        <span className="text-sm text-gray-400">{student.grade === 'MBA' ? 'MBA' : `Grade ${student.grade}`}</span>
+      <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3 flex-wrap">
+        <button onClick={() => navigate('/teacher')} className="text-slate-500 hover:text-slate-800 text-sm">← Back</button>
+        <h1 className="text-base font-semibold text-slate-800">{student.full_name}</h1>
+        <span className="text-sm text-slate-400">{student.grade === 'MBA' ? 'MBA' : `Grade ${student.grade}`}</span>
         <div className="ml-auto flex items-center gap-3 flex-wrap">
           {wpmTarget && (
-            <span className="text-xs text-gray-400">WPM target: {wpmTarget}</span>
+            <span className="text-xs text-slate-400">WPM target: {wpmTarget}</span>
           )}
           <button
             onClick={() => { setShowResetPassword(true); setPasswordResetSuccess(false) }}
-            className="text-sm text-gray-500 hover:text-gray-800 border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="text-sm text-slate-500 hover:text-slate-800 border border-slate-300 rounded-lg px-3 py-1.5 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
             aria-label="Reset password"
           >
             Reset Password
@@ -261,9 +261,9 @@ export default function StudentDetail() {
             { label: 'Avg Phrasing', value: avgPhrasing != null ? `${avgPhrasing}%` : '—' },
             { label: 'Avg Comprehension', value: avgComprehension != null ? `${avgComprehension}%` : '—' },
           ].map(stat => (
-            <div key={stat.label} className="bg-white rounded-2xl border border-gray-200 p-4 text-center">
-              <p className="text-2xl font-bold text-gray-800">{stat.value}</p>
-              <p className="text-xs text-gray-500 mt-1">{stat.label}</p>
+            <div key={stat.label} className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
+              <p className="text-2xl font-bold text-slate-800">{stat.value}</p>
+              <p className="text-xs text-slate-500 mt-1">{stat.label}</p>
               {stat.sub && (
                 <p className={`text-xs mt-0.5 font-medium ${stat.subColor}`}>{stat.sub}</p>
               )}
@@ -282,7 +282,7 @@ export default function StudentDetail() {
           const wpmMax = Math.ceil(Math.max(wpmTarget * 1.2, ...wpm) / 10) * 10
           return (
             <div>
-              <h2 className="text-base font-semibold text-gray-700 mb-3">Performance Trends</h2>
+              <h2 className="text-base font-semibold text-slate-700 mb-3">Performance Trends</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <MetricCard label="Accuracy" values={accuracy} color="#3b82f6" fillColor="#dbeafe" unit="%" />
                 <MetricCard
@@ -326,24 +326,24 @@ export default function StudentDetail() {
 
         {/* Session progress table */}
         <div>
-          <h2 className="text-base font-semibold text-gray-700 mb-3">Session Progress</h2>
+          <h2 className="text-base font-semibold text-slate-700 mb-3">Session Progress</h2>
           {sessions.length === 0 ? (
-            <p className="text-sm text-gray-400">No sessions yet.</p>
+            <p className="text-sm text-slate-400">No sessions yet.</p>
           ) : (
-            <div className="bg-white rounded-2xl border border-gray-200 overflow-x-auto">
+            <div className="bg-white rounded-2xl border border-slate-200 overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50">
-                    <th className="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">#</th>
-                    <th className="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Passage</th>
-                    <th className="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Date</th>
-                    <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Accuracy</th>
-                    <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">WPM</th>
-                    <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Phrasing</th>
-                    <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Skipped</th>
-                    <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Subs</th>
-                    <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Comp.</th>
-                    <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Cost</th>
+                  <tr className="border-b border-slate-100 bg-slate-50">
+                    <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">#</th>
+                    <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Passage</th>
+                    <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Date</th>
+                    <th className="text-center px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Accuracy</th>
+                    <th className="text-center px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">WPM</th>
+                    <th className="text-center px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Phrasing</th>
+                    <th className="text-center px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Skipped</th>
+                    <th className="text-center px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Subs</th>
+                    <th className="text-center px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Comp.</th>
+                    <th className="text-center px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Cost</th>
                     <th className="px-3 py-3"></th>
                   </tr>
                 </thead>
@@ -354,14 +354,14 @@ export default function StudentDetail() {
                     const prevPhrasing = prev ? (prev.score_phrasing ?? prev.score_fluency ?? 0) : null
                     const wpmColor = Math.abs(s.score_wpm - wpmTarget) <= 15
                       ? 'text-green-600'
-                      : s.score_wpm < wpmTarget ? 'text-yellow-600' : 'text-blue-600'
+                      : s.score_wpm < wpmTarget ? 'text-yellow-600' : 'text-indigo-600'
 
                     return (
                       <React.Fragment key={s.id}>
-                      <tr className={i < sessions.length - 1 ? 'border-b border-gray-100' : ''}>
-                        <td className="px-3 py-3 text-gray-400 text-xs">{i + 1}</td>
-                        <td className="px-3 py-3 text-gray-800 max-w-[120px] truncate">{s.passages?.title}</td>
-                        <td className="px-3 py-3 text-gray-500 text-xs whitespace-nowrap">
+                      <tr className={i < sessions.length - 1 ? 'border-b border-slate-100' : ''}>
+                        <td className="px-3 py-3 text-slate-400 text-xs">{i + 1}</td>
+                        <td className="px-3 py-3 text-slate-800 max-w-[120px] truncate">{s.passages?.title}</td>
+                        <td className="px-3 py-3 text-slate-500 text-xs whitespace-nowrap">
                           {new Date(s.created_at).toLocaleDateString()}
                         </td>
                         <TrendCell
@@ -394,7 +394,7 @@ export default function StudentDetail() {
                         </td>
                         {s.score_comprehension != null ? (
                           <td className="px-3 py-3 text-center">
-                            <span className="font-semibold text-gray-800">{s.score_comprehension}%</span>
+                            <span className="font-semibold text-slate-800">{s.score_comprehension}%</span>
                             {trend(s.score_comprehension, prev?.score_comprehension ?? null) && (
                               <span className={`ml-1 text-xs font-bold ${
                                 trend(s.score_comprehension, prev?.score_comprehension ?? null) === '↑'
@@ -412,16 +412,16 @@ export default function StudentDetail() {
                             </button>
                           </td>
                         ) : (
-                          <td className="px-3 py-3 text-center text-gray-300 text-xs">—</td>
+                          <td className="px-3 py-3 text-center text-slate-300 text-xs">—</td>
                         )}
-                        <td className="px-3 py-3 text-center text-xs font-mono text-gray-500">
+                        <td className="px-3 py-3 text-center text-xs font-mono text-slate-500">
                           {formatCost(computeSessionCost(s))}
                         </td>
                         <td className="px-3 py-3 text-center">
                           {s.feedback && (
                             <button
                               onClick={() => setOpenFeedbackId(openFeedbackId === s.id ? null : s.id)}
-                              className="text-xs text-blue-500 hover:text-blue-700 focus-visible:underline focus-visible:outline-none whitespace-nowrap"
+                              className="text-xs text-indigo-500 hover:text-indigo-700 focus-visible:underline focus-visible:outline-none whitespace-nowrap"
                               aria-label={`${openFeedbackId === s.id ? 'Hide' : 'Show'} feedback for session ${i + 1}`}
                             >
                               {openFeedbackId === s.id ? 'Hide' : 'Feedback'}
@@ -430,7 +430,7 @@ export default function StudentDetail() {
                         </td>
                       </tr>
                       {openFeedbackId === s.id && (
-                        <tr className="bg-blue-50">
+                        <tr className="bg-indigo-50">
                           <td colSpan={11} className="px-4 py-3">
                             <FeedbackPanel raw={s.feedback} />
                           </td>

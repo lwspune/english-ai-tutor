@@ -6,6 +6,8 @@ const corsHeaders = {
 }
 
 const VALID_GRADES = new Set(['9', '10', '11', '12', 'MBA'])
+const SITE_URL = 'https://english-ai-tutor-mauve.vercel.app'
+const FROM_EMAIL = 'tutor@lwspune.in'
 
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
@@ -18,6 +20,44 @@ function validateStudent(s: { full_name?: string; email?: string; password?: str
   if (!s.password || s.password.length < 8) errors.push('Password min 8 chars')
   if (!s.grade || !VALID_GRADES.has(s.grade)) errors.push('Invalid grade')
   return errors
+}
+
+async function sendWelcomeEmail(name: string, email: string, password: string, apiKey: string): Promise<void> {
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: FROM_EMAIL,
+      to: email,
+      subject: 'Welcome to English AI Tutor — Your Login Details',
+      html: `
+        <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+          <h2 style="color:#1e293b">Welcome, ${name}!</h2>
+          <p style="color:#475569">Your English AI Tutor account is ready. Here are your login details:</p>
+          <table style="border-collapse:collapse;width:100%;margin:16px 0;background:#f8fafc;border-radius:8px">
+            <tr>
+              <td style="padding:10px 14px;color:#64748b;width:90px">Email</td>
+              <td style="padding:10px 14px;font-weight:600;color:#1e293b">${email}</td>
+            </tr>
+            <tr style="background:#f1f5f9">
+              <td style="padding:10px 14px;color:#64748b">Password</td>
+              <td style="padding:10px 14px;font-weight:600;color:#1e293b">${password}</td>
+            </tr>
+          </table>
+          <a href="${SITE_URL}" style="display:inline-block;background:#4f46e5;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin:8px 0">
+            Start Practising →
+          </a>
+          <p style="color:#94a3b8;font-size:12px;margin-top:24px">English AI Tutor · LWS Pune</p>
+        </div>
+      `,
+    }),
+  })
+  if (!res.ok) {
+    throw new Error(`Resend ${res.status}: ${await res.text()}`)
+  }
 }
 
 Deno.serve(async (req) => {
@@ -36,7 +76,6 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     )
 
-    // Verify caller is a teacher
     const userClient = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_ANON_KEY')!,
@@ -63,7 +102,10 @@ Deno.serve(async (req) => {
       })
     }
 
+    const resendKey = Deno.env.get('RESEND_API_KEY')
     const results = []
+    const emailQueue: { name: string; email: string; password: string }[] = []
+
     for (const s of students) {
       const errors = validateStudent(s)
       if (errors.length > 0) {
@@ -79,10 +121,21 @@ Deno.serve(async (req) => {
       })
 
       if (error) {
-        results.push({ email: s.email, success: false, error: error.message })
+        results.push({ email: s.email, success: false, error: error.message || error.toString() || 'Failed to create user' })
       } else {
         results.push({ email: s.email, success: true, id: data.user.id })
+        emailQueue.push({ name: s.full_name.trim(), email: s.email, password: s.password })
       }
+    }
+
+    if (resendKey && emailQueue.length > 0) {
+      await Promise.allSettled(
+        emailQueue.map(({ name, email, password }) =>
+          sendWelcomeEmail(name, email, password, resendKey).catch(err => {
+            console.error('Welcome email failed for', email, err)
+          })
+        )
+      )
     }
 
     return new Response(JSON.stringify({ results }), { status: 200, headers: corsHeaders })

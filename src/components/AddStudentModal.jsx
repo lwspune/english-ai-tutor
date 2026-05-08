@@ -58,7 +58,7 @@ function SingleTab({ onClose }) {
 
     const result = data?.results?.[0]
     if (!result?.success) {
-      setError(result?.error ?? 'Failed to add student')
+      setError(result?.error || 'Failed to add student')
       return
     }
 

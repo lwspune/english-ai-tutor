@@ -93,6 +93,7 @@ set SUPABASE_ACCESS_TOKEN=<token>
 npx supabase functions deploy analyze-reading --no-verify-jwt
 npx supabase functions deploy create-student --no-verify-jwt
 npx supabase functions deploy reset-student-password --no-verify-jwt
+npx supabase functions deploy send-reminders --no-verify-jwt
 ```
 In bash (Git Bash / WSL): `SUPABASE_ACCESS_TOKEN=<token> npx supabase functions deploy <name> --no-verify-jwt`
 
@@ -176,21 +177,25 @@ After a reading session, if the passage has questions attached:
 - `src/components/WeeklySummaryModal.jsx` — overlay modal for weekly summary; props: `data`, `streak`, `onDismiss`
 - `src/components/Pagination.jsx` — shared pagination control; exports `PAGE_SIZE = 5` (named) and the component (default); props: `page`, `total`, `onPrev`, `onNext`, `testIdPrefix` (optional); renders nothing when `total ≤ PAGE_SIZE`
 - `src/components/BottomNav.jsx` — fixed bottom nav for student screens; Home tab (`/student`) + Progress tab (`/student/progress`); `aria-current="page"` on active tab; `min-h-[56px]` touch target; used in `StudentHome` and `StudentProgress`
+- `src/lib/reminders.js` — exports `buildReminderList(users, profiles, sessions, now)` → `[{ id, name, email, type: 'activation'|'reengagement', lastAccuracy? }]`. Pure function (no Supabase/Deno deps) used by `send-reminders` edge function and unit-tested in `src/lib/reminders.test.js`. Constants: `REMINDER_INTERVAL_MS` = 3 days, `MIN_ACCOUNT_AGE_MS` = 2 days.
+- `src/pages/ResetPasswordPage.jsx` — public route at `/reset-password`. Three states: waiting (before `PASSWORD_RECOVERY` event), Set-password form (after event), expired/invalid link (when URL hash carries `error_code`). The expired state inlines an email form that re-calls `supabase.auth.resetPasswordForEmail`.
 
 ### Auth & routing
 - `AuthContext` holds both the Supabase `user` and app `profile` (from `profiles` table). Always use `profile` for role/grade — never `user.user_metadata` in components.
 - `ProtectedRoute` accepts optional `role` prop (`"teacher"` | `"student"`). Root `/` redirects based on `profile.role`.
 - **Student self-registration:** `LoginPage` has Sign In / Sign Up tabs. Sign Up validates a class code via `validate_class_code` RPC (callable by anon), then calls `supabase.auth.signUp()` with `raw_user_meta_data: { full_name, role: 'student', grade }`. The `handle_new_user` trigger auto-creates the profile. Teachers cannot self-register.
-- The `handle_new_user` DB trigger auto-creates a `profiles` row on signup using `raw_user_meta_data`. When creating users manually via the Supabase dashboard, insert profiles via SQL instead (the dashboard doesn't set metadata at creation time).
+- **Password reset (self-service):** `LoginPage` sign-in form has a "Forgot password?" trigger that switches to an inline form calling `supabase.auth.resetPasswordForEmail(email, { redirectTo: '/reset-password' })`. The recovery link lands on the public `/reset-password` route (`ResetPasswordPage`), which listens for the `PASSWORD_RECOVERY` auth event and shows a Set-password form. If the link is expired/invalid, the URL hash carries `error_code=otp_expired|...` and the page renders an inline "Send new link" form instead. The Supabase recovery email subject + HTML template was customised via Management API to match the slate/indigo design system; `uri_allow_list` includes the production `/reset-password` URL.
+- The `handle_new_user` DB trigger auto-creates a `profiles` row on signup using `raw_user_meta_data`. The function pins `search_path = public` and qualifies inserts as `public.profiles` — see Known production quirks for why. When creating users manually via the Supabase dashboard, insert profiles via SQL instead (the dashboard doesn't set metadata at creation time).
 - `onAuthStateChange` intentionally ignores `TOKEN_REFRESHED` and `INITIAL_SESSION` events — acting on them sets `loading=true` and causes a full page remount when the user switches back to the tab.
 
 ### Database schema (key points)
-- `profiles` — `role` is `teacher` or `student`; `grade` is `text` (`'9'`–`'12'` or `'MBA'`, null for teachers); migration 009 changed this from `int`
+- `profiles` — `role` is `teacher` or `student`; `grade` is `text` (`'9'`–`'12'` or `'MBA'`, null for teachers); migration 009 changed this from `int`. `last_reminder_sent timestamptz` (added migration 013) tracks last activation/re-engagement email timestamp.
 - `passages` — `word_count` computed client-side on insert/edit in `PassageManager`; `grade_level` is `text` (`'9'`–`'12'` or `'MBA'`, nullable for all-grades passages); migration 009 changed this from `int`; `difficulty` is `text` (`'easy'` | `'moderate'` | `'hard'`, default `'easy'`, CHECK constraint enforced) added in migration 011; constraint made idempotent in migration 012
 - `sessions` — `word_results` JSONB `[{ word, spoken, status }]`, status ∈ `correct | substitution | omission`; also stores `score_accuracy`, `score_wpm`, `score_phrasing`, `score_fluency` (same as phrasing, kept for compat), `count_omissions`, `count_substitutions`, `feedback` (JSON string or plain text), `score_comprehension` (int nullable), `comprehension_answers` (jsonb nullable — `[{ question_id, selected_index, is_correct }]`), `whisper_duration_seconds` (numeric nullable), `llm_input_tokens` (int nullable), `llm_output_tokens` (int nullable) — the last three are null for sessions recorded before migration 010
 - `questions` — `passage_id` FK, `question_text`, `options` (jsonb array of 4 strings), `correct_index` (0–3), `display_order`; max 5 per passage enforced by DB trigger `enforce_question_limit`
-- `app_settings` — single-row table (`id boolean PK default true`), holds `ai_feedback_enabled boolean`, `class_code text` (random 6-char code set on migration; teacher shares with students for self-registration), `daily_session_limit int` (default 5; teacher adjusts via dashboard stepper, clamped 1–20)
+- `app_settings` — single-row table (`id boolean PK default true`), holds `ai_feedback_enabled boolean`, `class_code text` (random 6-char code set on migration; teacher shares with students for self-registration), `daily_session_limit int` (default 5; teacher adjusts via dashboard stepper, clamped 1–20), `cron_secret text` (auto-generated in migration 013; shared between pg_cron job and `send-reminders` edge function)
 - RLS on all tables. `is_teacher()` security definer function used in profiles policy to avoid infinite recursion.
+- **Scheduled jobs:** pg_cron + pg_net schedule `send-daily-reminders` runs at 04:30 UTC (10:00 AM IST) and POSTs to the `send-reminders` edge function with `x-cron-secret` header. Defined in migration 013.
 
 ### RPCs
 - `grade_comprehension(p_session_id, p_answers)` — server-side comprehension grading; validates session ownership, prevents re-grading, saves score atomically
@@ -199,12 +204,15 @@ After a reading session, if the passage has questions attached:
 
 ### Edge functions
 - `analyze-reading` — main reading evaluation pipeline (Whisper + GPT-4o-mini); saves cost metrics to sessions
-- `create-student` — teacher creates one or many students; accepts `{ students: [{ full_name, email, password, grade }] }`; verifies caller is teacher; uses `auth.admin.createUser` with `email_confirm: true`; `handle_new_user` trigger auto-creates profiles
+- `create-student` — teacher creates one or many students; accepts `{ students: [{ full_name, email, password, grade }] }`; verifies caller is teacher; uses `auth.admin.createUser` with `email_confirm: true`; `handle_new_user` trigger auto-creates profiles. After successful creation, sends a welcome email per student via Resend (wrapped in `Promise.allSettled` — email failures do not fail the user creation).
 - `reset-student-password` — teacher resets a student's password; accepts `{ student_id, new_password }`; verifies caller is teacher; guards against resetting non-student accounts; uses `auth.admin.updateUserById`
+- `send-reminders` — daily activation/re-engagement engine; called by pg_cron at 04:30 UTC. Validates `x-cron-secret` header against `app_settings.cron_secret`. Builds a list of students who either never logged in (account ≥ 2 days old) or have been inactive 3+ days, with a 3-day cooldown between reminders to the same student. Activation emails contain a fresh `admin.generateLink({ type: 'recovery' })` link so the student can set their own password (not a stored plaintext). Re-engagement emails link directly to the app. Pure list-building logic lives in `src/lib/reminders.js` (`buildReminderList`) and is unit-tested.
 
 ### Known production quirks
 - **Edge function must be deployed with `--no-verify-jwt`** — Supabase's new `sb_publishable_...` key format is not a JWT, so the runtime rejects requests otherwise.
 - **On Windows CMD, `KEY=value command` syntax doesn't work** — use `set KEY=value` then the command on a separate line. In bash (Git Bash / WSL) the inline syntax works fine.
+- **`handle_new_user` must qualify `public.profiles` and pin `search_path = public`** — installing `pg_cron` / `pg_net` (migration 013) shifted the function's resolved schemas, so unqualified `profiles` started failing with `relation "profiles" does not exist`. Symptom: `auth.admin.createUser` returned an error and `auth.users` had no row. Fix was applied via `apply_migration` (`handle_new_user_search_path`) but is not yet captured as a numbered migration file in the repo.
+- **Resend domain verification:** sender `tutor@lwspune.in` requires the domain to be verified on Resend (SPF + DKIM DNS records). Until verified, Resend returns `403 "domain not verified"` and `Promise.allSettled` swallows the error so users get created without a welcome email. Pending — see `memory/project_pending_resend.md`.
 - **Creating teacher accounts manually:** Supabase Auth dashboard doesn't set `raw_user_meta_data` at creation time, so the trigger inserts with default role `student`. Always follow up with a manual SQL insert into `profiles` for the correct role/name.
 - **Email confirmation:** If Supabase Auth email confirmation is enabled, students see a "check your email" screen after signup. For school use, consider disabling it (Auth → Settings → disable email confirmations).
 - **Storage RLS:** `storage.objects` has a policy `students can upload audio` allowing authenticated users to upload to their own folder (`{uid}/...`). Service role in the edge function bypasses this for downloads.
@@ -219,6 +227,7 @@ Frontend (`.env.local`):
 
 Edge function secrets (Supabase dashboard → Edge Functions → Secrets):
 - `OPENAI_API_KEY` — used for both Whisper and GPT-4o-mini
+- `RESEND_API_KEY` — used by `create-student` (welcome emails) and `send-reminders` (activation/re-engagement emails)
 - `SUPABASE_SERVICE_ROLE_KEY` (auto-injected by Supabase runtime)
 
 ### Decisions log
@@ -248,6 +257,11 @@ Key product and architecture decisions captured here so future sessions don't re
 | TeacherDashboard header | Split identity row + controls strip | Cramped single-row header wrapped on laptop screens; separation makes each group of controls scannable |
 | TeacherDashboard stat chips | 3 summary chips (Students / Sessions / Avg Accuracy) computed from already-fetched student list | Teacher needs a class pulse at a glance before drilling into rows; no extra DB query needed |
 | Colour-only UI changes | No new tests required | Presentational changes carry no behaviour to test; existing tests already verify component renders correctly |
+| Self-service password reset | `supabase.auth.resetPasswordForEmail` called from frontend (no edge function); landing page is `/reset-password` | Built-in Supabase flow is rate-limited (2/hour) and free; an edge function would just be a wrapper |
+| Activation flow uses recovery links | `admin.generateLink({ type: 'recovery' })` in welcome/activation emails, not stored plaintext passwords | Same UX as forgot-password; works for re-engagement of existing users; avoids exposing teacher-set passwords in email |
+| Reminder scheduling | pg_cron + pg_net inside Supabase, not external cron service | Stays on the existing stack; cron secret in `app_settings` shared with edge function for auth |
+| Email provider | Resend with custom domain (`tutor@lwspune.in`) | Owned-domain sender for trust; Supabase invite emails were skipped because they don't fit a teacher-distributed-credentials flow |
+| Recovery email template | Customised once via Management API to serve both first-time activation and password reset | Supabase only has one `recovery` template — copy is written generically ("set your password") to fit both contexts |
 
 ### Adding teacher accounts (manual process)
 ```sql

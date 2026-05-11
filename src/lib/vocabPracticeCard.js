@@ -51,6 +51,7 @@ export function buildPracticeCards(deckWords, allWords, options = {}) {
       part_of_speech: word.part_of_speech,
       definition: word.definition,
       example_sentence: word.example_sentence,
+      audio_path: word.audio_path ?? null,
       exerciseType,
       prompt:
         exerciseType === 'synonym'

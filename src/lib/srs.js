@@ -1,6 +1,7 @@
 export const BOX_INTERVALS_DAYS = [1, 3, 7, 14, 30]
 export const MAX_BOX = 5
 export const MASTERY_CORRECT_THRESHOLD = 3
+export const MAINTENANCE_INTERVAL_DAYS = 30
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -19,6 +20,11 @@ export function nextReview(currentBox, wasCorrect, now) {
 export function isMastered({ srs_box, correct_count, mastered_at }) {
   if (mastered_at) return true
   return srs_box >= MAX_BOX && correct_count >= MASTERY_CORRECT_THRESHOLD
+}
+
+export function isDueForMaintenance({ mastered_at }, now) {
+  if (!mastered_at) return false
+  return new Date(mastered_at).getTime() + MAINTENANCE_INTERVAL_DAYS * DAY_MS <= now.getTime()
 }
 
 export function dueWords(progressList, now) {

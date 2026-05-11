@@ -37,12 +37,16 @@ const QUESTION = {
   display_order: 1,
 }
 
-const { sessionRef, prevSessionsRef, questionsRef, profileRef, vocabRef } = vi.hoisted(() => ({
+const { sessionRef, prevSessionsRef, questionsRef, profileRef, vocabRef, progressRef, updateCalls, rpcCalls, rpcMock } = vi.hoisted(() => ({
   sessionRef: { data: null },
   prevSessionsRef: { data: [] },
   questionsRef: { data: [] },
   profileRef: { data: { grade: 10 } },
   vocabRef: { data: [] },
+  progressRef: { data: [] },
+  updateCalls: { value: [] },
+  rpcCalls: { value: [] },
+  rpcMock: (...args) => { rpcCalls.value.push(args); return Promise.resolve({ data: {}, error: null }) },
 }))
 
 vi.mock('../../lib/supabase', () => ({
@@ -62,6 +66,12 @@ vi.mock('../../lib/supabase', () => ({
               }),
             }
           },
+          update: (payload) => ({
+            eq: () => {
+              updateCalls.value.push(payload)
+              return Promise.resolve({ error: null })
+            },
+          }),
         }
       }
       if (table === 'profiles') {
@@ -79,8 +89,14 @@ vi.mock('../../lib/supabase', () => ({
           select: () => Promise.resolve({ data: vocabRef.data }),
         }
       }
+      if (table === 'student_word_progress') {
+        return {
+          select: () => ({ eq: () => Promise.resolve({ data: progressRef.data }) }),
+        }
+      }
       return {}
     },
+    rpc: (...args) => rpcMock(...args),
   },
 }))
 
@@ -91,6 +107,9 @@ beforeEach(() => {
   questionsRef.data = []
   profileRef.data = { grade: 10 }
   vocabRef.data = []
+  progressRef.data = []
+  updateCalls.value = []
+  rpcCalls.value = []
 })
 
 // ─── Scores ───────────────────────────────────────────────────────────────────
@@ -278,5 +297,71 @@ describe('SessionReport — vocab highlight', () => {
     render(<SessionReport />)
     await waitFor(() => screen.getByText('Hello'))
     expect(screen.queryByTestId('vocab-word-hello')).not.toBeInTheDocument()
+  })
+})
+
+// ─── Vocab retention quiz (v2 F3) ──────────────────────────────────────────
+
+describe('SessionReport — vocab retention quiz', () => {
+  const ABANDON = {
+    id: 'w1', word: 'Abandon', part_of_speech: 'verb',
+    definition: 'To give up.', example_sentence: 'They abandoned the plan.',
+    synonyms: ['forsake', 'desert'], antonyms: ['keep', 'retain'],
+  }
+  const BRISK = {
+    id: 'w2', word: 'Brisk', part_of_speech: 'adjective',
+    definition: 'Quick.', example_sentence: 'A brisk walk.',
+    synonyms: ['quick', 'lively'], antonyms: ['slow', 'sluggish'],
+  }
+
+  it('is hidden for grade 9/10 students', async () => {
+    profileRef.data = { grade: '10' }
+    vocabRef.data = [ABANDON]
+    sessionRef.data = { ...BASE_SESSION, word_results: [{ word: 'Abandon', status: 'correct' }] }
+    render(<SessionReport />)
+    await waitFor(() => screen.getByText('Abandon'))
+    expect(screen.queryByTestId('retention-quiz')).not.toBeInTheDocument()
+  })
+
+  it('is hidden when no vocab words match the passage', async () => {
+    profileRef.data = { grade: '11' }
+    vocabRef.data = [ABANDON]
+    sessionRef.data = { ...BASE_SESSION, word_results: [{ word: 'unrelated', status: 'correct' }] }
+    render(<SessionReport />)
+    await waitFor(() => screen.getByText('unrelated'))
+    expect(screen.queryByTestId('retention-quiz')).not.toBeInTheDocument()
+  })
+
+  it('is hidden when session.vocab_retention_answers is already populated', async () => {
+    profileRef.data = { grade: '11' }
+    vocabRef.data = [ABANDON]
+    sessionRef.data = {
+      ...BASE_SESSION,
+      word_results: [{ word: 'Abandon', status: 'correct' }],
+      vocab_retention_answers: [{ word_id: 'w1', selected_index: 0, was_correct: true }],
+    }
+    render(<SessionReport />)
+    await waitFor(() => screen.getByText('Abandon'))
+    expect(screen.queryByTestId('retention-quiz')).not.toBeInTheDocument()
+  })
+
+  it('renders the quiz when conditions are right', async () => {
+    profileRef.data = { grade: '11' }
+    vocabRef.data = [ABANDON, BRISK]
+    sessionRef.data = { ...BASE_SESSION, word_results: [{ word: 'Abandon', status: 'correct' }] }
+    render(<SessionReport />)
+    await waitFor(() => expect(screen.getByTestId('retention-quiz')).toBeInTheDocument())
+    expect(screen.getByRole('heading', { name: 'Abandon' })).toBeInTheDocument()
+  })
+
+  it('Skip button dismisses the quiz section', async () => {
+    const user = (await import('@testing-library/user-event')).default.setup()
+    profileRef.data = { grade: '11' }
+    vocabRef.data = [ABANDON, BRISK]
+    sessionRef.data = { ...BASE_SESSION, word_results: [{ word: 'Abandon', status: 'correct' }] }
+    render(<SessionReport />)
+    await waitFor(() => screen.getByTestId('retention-quiz'))
+    await user.click(screen.getByRole('button', { name: /^skip$/i }))
+    expect(screen.queryByTestId('retention-quiz')).not.toBeInTheDocument()
   })
 })

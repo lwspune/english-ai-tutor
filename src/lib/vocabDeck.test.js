@@ -110,4 +110,26 @@ describe('assembleDeck', () => {
     const deck = assembleDeck(progress, words, NOW)
     expect(deck.map(d => d.id)).toEqual(['a'])
   })
+
+  it('includes mastered words past the maintenance interval (30 days)', () => {
+    const words = [w('a'), w('b')]
+    const dayMs = 86_400_000
+    const masteredOld = new Date(NOW.getTime() - 31 * dayMs).toISOString()
+    const masteredRecent = new Date(NOW.getTime() - 5 * dayMs).toISOString()
+    const progress = [
+      p('a', { due: '2026-05-01T00:00:00Z', mastered: masteredOld }),
+      p('b', { due: '2026-05-01T00:00:00Z', mastered: masteredRecent }),
+    ]
+    const deck = assembleDeck(progress, words, NOW)
+    expect(deck.map(d => d.id)).toEqual(['a'])
+  })
+
+  it('mastered word at exactly 30 days is due for maintenance', () => {
+    const words = [w('a')]
+    const dayMs = 86_400_000
+    const masteredAt = new Date(NOW.getTime() - 30 * dayMs).toISOString()
+    const progress = [p('a', { due: masteredAt, mastered: masteredAt })]
+    const deck = assembleDeck(progress, words, NOW)
+    expect(deck.map(d => d.id)).toEqual(['a'])
+  })
 })

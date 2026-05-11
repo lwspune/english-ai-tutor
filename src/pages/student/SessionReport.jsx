@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { WPM_TARGETS } from '../../lib/wpmTargets'
+import AudioPlayButton from '../../components/AudioPlayButton'
+import { buildRetentionQuiz } from '../../lib/vocabRetentionQuiz'
 
 const VOCAB_GRADES = new Set(['11', '12', 'MBA'])
 const normalizeWord = (s) => s.toLowerCase().replace(/^[^a-z-]+|[^a-z-]+$/g, '')
@@ -21,7 +23,10 @@ function VocabSheet({ vocab, onClose }) {
       >
         <div className="flex items-baseline justify-between gap-3">
           <div className="min-w-0">
-            <h3 className="text-xl font-bold text-slate-800">{vocab.word}</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-xl font-bold text-slate-800">{vocab.word}</h3>
+              <AudioPlayButton audioPath={vocab.audio_path} word={vocab.word} />
+            </div>
             <p className="text-xs uppercase tracking-wide text-slate-400 mt-0.5">{vocab.part_of_speech}</p>
           </div>
           <button
@@ -142,6 +147,12 @@ export default function SessionReport() {
   const [personalBest, setPersonalBest] = useState(null)
   const [vocabMap, setVocabMap] = useState(null) // Map<lowercase word, vocab>
   const [openVocab, setOpenVocab] = useState(null)
+  const [retentionCards, setRetentionCards] = useState([])
+  const [retentionIndex, setRetentionIndex] = useState(0)
+  const [retentionSelected, setRetentionSelected] = useState(null)
+  const [retentionAnswers, setRetentionAnswers] = useState([])
+  const [retentionSkipped, setRetentionSkipped] = useState(false)
+  const [retentionDone, setRetentionDone] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -176,12 +187,17 @@ export default function SessionReport() {
       }
 
       if (VOCAB_GRADES.has(String(p?.grade))) {
-        const { data: vocab } = await supabase
-          .from('vocabulary_words')
-          .select('word, part_of_speech, definition, example_sentence')
+        const [{ data: vocab }, { data: progress }] = await Promise.all([
+          supabase.from('vocabulary_words').select('id, word, part_of_speech, definition, example_sentence, audio_path, synonyms, antonyms'),
+          supabase.from('student_word_progress').select('word_id, mastered_at').eq('student_id', s.student_id),
+        ])
         const map = new Map()
         for (const v of vocab ?? []) map.set(v.word.toLowerCase(), v)
         setVocabMap(map)
+        if (!s.vocab_retention_answers) {
+          const cards = buildRetentionQuiz(s.word_results ?? [], map, progress ?? [], vocab ?? [])
+          setRetentionCards(cards)
+        }
       }
     }
     load()
@@ -261,6 +277,85 @@ export default function SessionReport() {
 
         {/* Feedback */}
         {session.feedback && <FeedbackCard raw={session.feedback} />}
+
+        {/* Vocab retention quiz — once-only, inline, before comprehension */}
+        {!retentionSkipped && !retentionDone && retentionCards.length > 0 && (() => {
+          const card = retentionCards[retentionIndex]
+          const answered = retentionSelected !== null
+          async function handleRetentionPick(i) {
+            if (answered) return
+            setRetentionSelected(i)
+            const wasCorrect = i === card.correctIndex
+            const answer = { word_id: card.word_id, selected_index: i, was_correct: wasCorrect }
+            const allAnswers = [...retentionAnswers, answer]
+            setRetentionAnswers(allAnswers)
+            await supabase.rpc('grade_vocab_attempt', { p_word_id: card.word_id, p_was_correct: wasCorrect })
+          }
+          async function handleRetentionNext() {
+            const isLast = retentionIndex + 1 >= retentionCards.length
+            if (isLast) {
+              await supabase.from('sessions').update({ vocab_retention_answers: retentionAnswers }).eq('id', sessionId)
+              setRetentionDone(true)
+            } else {
+              setRetentionIndex(retentionIndex + 1)
+              setRetentionSelected(null)
+            }
+          }
+          return (
+            <div data-testid="retention-quiz" className="bg-indigo-50 rounded-2xl border border-indigo-200 p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-indigo-900">
+                  Quick check — vocab from this passage
+                  <span className="ml-2 text-xs font-normal text-indigo-700">{retentionIndex + 1} / {retentionCards.length}</span>
+                </h3>
+                <button
+                  onClick={() => setRetentionSkipped(true)}
+                  className="text-xs text-indigo-600 hover:text-indigo-800 underline"
+                >
+                  Skip
+                </button>
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-2xl font-bold text-slate-800">{card.word}</h4>
+                  <AudioPlayButton audioPath={card.audio_path} word={card.word} />
+                </div>
+                <p className="text-xs uppercase tracking-wide text-slate-400">{card.part_of_speech}</p>
+              </div>
+              <p className="text-sm text-indigo-900 font-medium">{card.prompt}</p>
+              <div className="space-y-2">
+                {card.options.map((opt, i) => {
+                  const isCorrect = i === card.correctIndex
+                  const isSelected = i === retentionSelected
+                  let style = 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                  if (answered) {
+                    if (isCorrect) style = 'bg-green-50 border-green-400 text-green-800 font-medium'
+                    else if (isSelected) style = 'bg-red-50 border-red-400 text-red-800'
+                    else style = 'bg-white border-slate-200 text-slate-400'
+                  }
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => handleRetentionPick(i)}
+                      disabled={answered}
+                      className={`w-full text-left text-sm border rounded-xl px-4 py-3 transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${style}`}
+                    >
+                      {opt}
+                    </button>
+                  )
+                })}
+              </div>
+              {answered && (
+                <button
+                  onClick={handleRetentionNext}
+                  className="w-full bg-indigo-600 text-white text-sm font-medium px-4 py-3 rounded-xl hover:bg-indigo-700 transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+                >
+                  {retentionIndex + 1 < retentionCards.length ? 'Next' : 'Done'}
+                </button>
+              )}
+            </div>
+          )
+        })()}
 
         {/* Comprehension CTA */}
         {questions.length > 0 && session.comprehension_answers == null && (

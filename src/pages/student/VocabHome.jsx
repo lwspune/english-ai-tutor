@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/AuthContext'
 import BottomNav from '../../components/BottomNav'
+import { isDueForMaintenance } from '../../lib/srs'
 
 const VOCAB_GRADES = new Set(['11', '12', 'MBA'])
 
@@ -29,11 +30,15 @@ export default function VocabHome() {
         .select('mastered_at, next_review_at, last_encounter_source')
         .eq('student_id', profile.id)
 
-      const now = Date.now()
+      const nowDate = new Date()
+      const now = nowDate.getTime()
       const rows = progress ?? []
       setTotal(totalCount ?? 0)
       setMastered(rows.filter(r => r.mastered_at).length)
-      setDue(rows.filter(r => !r.mastered_at && new Date(r.next_review_at).getTime() <= now).length)
+      setDue(rows.filter(r => {
+        if (r.mastered_at) return isDueForMaintenance(r, nowDate)
+        return new Date(r.next_review_at).getTime() <= now
+      }).length)
       setSeen(rows.length)
       setSeenFromReading(rows.filter(r => r.last_encounter_source === 'reading').length)
       setLoading(false)

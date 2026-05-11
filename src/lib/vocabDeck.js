@@ -1,3 +1,5 @@
+import { isDueForMaintenance } from './srs'
+
 export const DEFAULT_MAX_NEW = 5
 
 export function assembleDeck(progressList, allWords, now, options = {}) {
@@ -11,8 +13,12 @@ export function assembleDeck(progressList, allWords, now, options = {}) {
     const progress = progressByWordId.get(word.id)
     if (!progress) continue
     seenWordIds.add(word.id)
-    if (progress.mastered_at) continue
-    if (new Date(progress.next_review_at).getTime() > t) continue
+    if (progress.mastered_at) {
+      // Mastered words re-enter the deck once they cross the maintenance interval
+      if (!isDueForMaintenance(progress, now)) continue
+    } else {
+      if (new Date(progress.next_review_at).getTime() > t) continue
+    }
     due.push({ ...word, progress })
   }
   due.sort(

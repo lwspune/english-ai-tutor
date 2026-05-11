@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/AuthContext'
 import BottomNav from '../../components/BottomNav'
+import AudioPlayButton from '../../components/AudioPlayButton'
 import { assembleDeck } from '../../lib/vocabDeck'
 import { buildPracticeCards } from '../../lib/vocabPracticeCard'
 
@@ -100,7 +101,10 @@ export default function VocabPractice() {
               <p className="text-xs uppercase tracking-wide text-slate-400 font-medium">
                 {card.part_of_speech}
               </p>
-              <h2 className="text-3xl font-bold text-slate-800 mt-1">{card.word}</h2>
+              <div className="flex items-center gap-2 mt-1">
+                <h2 className="text-3xl font-bold text-slate-800">{card.word}</h2>
+                <AudioPlayButton audioPath={card.audio_path} word={card.word} />
+              </div>
               <p className="text-sm text-slate-600 mt-3">{card.definition}</p>
               <p className="text-sm text-slate-500 italic mt-2">"{card.example_sentence}"</p>
             </div>

@@ -3,8 +3,10 @@ import {
   BOX_INTERVALS_DAYS,
   MAX_BOX,
   MASTERY_CORRECT_THRESHOLD,
+  MAINTENANCE_INTERVAL_DAYS,
   nextReview,
   isMastered,
+  isDueForMaintenance,
   dueWords,
 } from './srs'
 
@@ -87,6 +89,36 @@ describe('isMastered', () => {
     expect(MAX_BOX).toBe(5)
     expect(MASTERY_CORRECT_THRESHOLD).toBe(3)
     expect(BOX_INTERVALS_DAYS).toEqual([1, 3, 7, 14, 30])
+  })
+})
+
+describe('isDueForMaintenance', () => {
+  it('MAINTENANCE_INTERVAL_DAYS is 30', () => {
+    expect(MAINTENANCE_INTERVAL_DAYS).toBe(30)
+  })
+
+  it('non-mastered word is never due for maintenance', () => {
+    expect(isDueForMaintenance({ mastered_at: null }, NOW)).toBe(false)
+    expect(isDueForMaintenance({}, NOW)).toBe(false)
+  })
+
+  it('just-mastered word is not yet due for maintenance', () => {
+    expect(isDueForMaintenance({ mastered_at: NOW.toISOString() }, NOW)).toBe(false)
+  })
+
+  it('mastered 29 days ago: not yet due', () => {
+    const masteredAt = new Date(NOW.getTime() - 29 * DAY_MS).toISOString()
+    expect(isDueForMaintenance({ mastered_at: masteredAt }, NOW)).toBe(false)
+  })
+
+  it('mastered exactly 30 days ago: due', () => {
+    const masteredAt = new Date(NOW.getTime() - 30 * DAY_MS).toISOString()
+    expect(isDueForMaintenance({ mastered_at: masteredAt }, NOW)).toBe(true)
+  })
+
+  it('mastered 60 days ago: due', () => {
+    const masteredAt = new Date(NOW.getTime() - 60 * DAY_MS).toISOString()
+    expect(isDueForMaintenance({ mastered_at: masteredAt }, NOW)).toBe(true)
   })
 })
 

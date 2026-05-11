@@ -169,6 +169,32 @@ describe('VocabHome — practice button', () => {
   })
 })
 
+describe('VocabHome — maintenance check', () => {
+  it('mastered word from 31 days ago counts as due', async () => {
+    const dayMs = 86_400_000
+    const masteredAt = new Date(Date.now() - 31 * dayMs).toISOString()
+    mockTotal.value = 5
+    mockProgress.value = [
+      { mastered_at: masteredAt, next_review_at: masteredAt },
+    ]
+    render(<VocabHome />)
+    await screen.findByRole('button', { name: /start practice/i })
+    expect(screen.getByTestId('due-count')).toHaveTextContent('1')
+  })
+
+  it('mastered word from 5 days ago does not count as due', async () => {
+    const dayMs = 86_400_000
+    const masteredAt = new Date(Date.now() - 5 * dayMs).toISOString()
+    mockTotal.value = 5
+    mockProgress.value = [
+      { mastered_at: masteredAt, next_review_at: masteredAt },
+    ]
+    render(<VocabHome />)
+    await screen.findByRole('button', { name: /start practice/i })
+    expect(screen.getByTestId('due-count')).toHaveTextContent('0')
+  })
+})
+
 describe('VocabHome — reading encounters', () => {
   it('hides the reading encounters line when none', async () => {
     mockProgress.value = []

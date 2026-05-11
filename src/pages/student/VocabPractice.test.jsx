@@ -12,11 +12,17 @@ vi.mock('../../components/BottomNav', () => ({
   default: () => <div data-testid="bottom-nav" />,
 }))
 
-const { mockProfile, mockWords, mockProgress, mockRpc } = vi.hoisted(() => ({
+const { mockProfile, mockWords, mockProgress, mockRpc, mockFeedback } = vi.hoisted(() => ({
   mockProfile: { value: { id: 's1', grade: '11' } },
   mockWords: { value: [] },
   mockProgress: { value: [] },
   mockRpc: vi.fn(() => Promise.resolve({ data: {}, error: null })),
+  mockFeedback: vi.fn(),
+}))
+
+vi.mock('../../lib/feedback', () => ({
+  feedback: (...args) => mockFeedback(...args),
+  prefersReducedMotion: () => false,
 }))
 
 vi.mock('../../lib/AuthContext', () => ({
@@ -85,6 +91,7 @@ beforeEach(() => {
   mockRpc.mockClear()
   mockRpc.mockResolvedValue({ data: {}, error: null })
   mockNavigate.mockReset()
+  mockFeedback.mockClear()
 })
 
 afterEach(() => {
@@ -172,6 +179,71 @@ describe('VocabPractice', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Brisk' })).toBeInTheDocument()
     })
+  })
+
+  it('fires feedback("correct") on correct answer', async () => {
+    const user = userEvent.setup()
+    render(<VocabPractice />)
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Abandon' })).toBeInTheDocument())
+    await user.click(screen.getByRole('button', { name: /^forsake$/i }))
+    expect(mockFeedback).toHaveBeenCalledWith('correct')
+  })
+
+  it('fires feedback("wrong") on wrong answer', async () => {
+    const user = userEvent.setup()
+    render(<VocabPractice />)
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Abandon' })).toBeInTheDocument())
+    const options = screen.getAllByTestId(/^option-/)
+    const wrongOption = [...options].find(b => !['forsake', 'desert', 'leave'].includes(b.textContent.toLowerCase()))
+    await user.click(wrongOption)
+    expect(mockFeedback).toHaveBeenCalledWith('wrong')
+  })
+
+  it('shows mastery confetti when a correct answer tips the word to box 5 with count >=3', async () => {
+    const user = userEvent.setup()
+    // Pre-state: box 4, correct_count 2, not mastered. Correct answer → box 5 + count 3 → mastery.
+    mockProgress.value = [
+      { word_id: 'w1', srs_box: 4, correct_count: 2, mastered_at: null, next_review_at: '2026-04-01T00:00:00Z' },
+    ]
+    render(<VocabPractice />)
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Abandon' })).toBeInTheDocument())
+    await user.click(screen.getByRole('button', { name: /^forsake$/i }))
+    await waitFor(() => expect(screen.getByTestId('confetti')).toBeInTheDocument())
+    expect(mockFeedback).toHaveBeenCalledWith('celebrate')
+  })
+
+  it('does NOT show mastery confetti on a new word (no tipping point)', async () => {
+    const user = userEvent.setup()
+    mockProgress.value = []
+    render(<VocabPractice />)
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Abandon' })).toBeInTheDocument())
+    await user.click(screen.getByRole('button', { name: /^forsake$/i }))
+    expect(screen.queryByTestId('confetti')).not.toBeInTheDocument()
+  })
+
+  it('does NOT show mastery confetti on a wrong answer (even at tipping point)', async () => {
+    const user = userEvent.setup()
+    mockProgress.value = [
+      { word_id: 'w1', srs_box: 4, correct_count: 2, mastered_at: null, next_review_at: '2026-04-01T00:00:00Z' },
+    ]
+    render(<VocabPractice />)
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Abandon' })).toBeInTheDocument())
+    const options = screen.getAllByTestId(/^option-/)
+    const wrongOption = [...options].find(b => !['forsake', 'desert', 'leave'].includes(b.textContent.toLowerCase()))
+    await user.click(wrongOption)
+    expect(screen.queryByTestId('confetti')).not.toBeInTheDocument()
+  })
+
+  it('does NOT show mastery confetti on a word already mastered', async () => {
+    const user = userEvent.setup()
+    mockProgress.value = [
+      { word_id: 'w1', srs_box: 5, correct_count: 5, mastered_at: '2026-04-01T00:00:00Z', next_review_at: '2026-04-01T00:00:00Z' },
+    ]
+    // Already mastered word still in deck (maintenance check), but correct again should not re-fire confetti.
+    render(<VocabPractice />)
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Abandon' })).toBeInTheDocument())
+    await user.click(screen.getByRole('button', { name: /^forsake$/i }))
+    expect(screen.queryByTestId('confetti')).not.toBeInTheDocument()
   })
 
   it('shows session summary after the last card', async () => {

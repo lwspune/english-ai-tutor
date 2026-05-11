@@ -9,6 +9,11 @@ import { shouldShowWeeklySummary, markWeeklySummaryShown, computeWeeklySummaryDa
 import WeeklySummaryModal from '../../components/WeeklySummaryModal'
 import Pagination, { PAGE_SIZE } from '../../components/Pagination'
 import BottomNav from '../../components/BottomNav'
+import FeedbackSettingsSheet from '../../components/FeedbackSettingsSheet'
+import Confetti from '../../components/Confetti'
+import { feedback } from '../../lib/feedback'
+
+const STREAK_MILESTONES = [5, 10, 20]
 
 function passageMeta(p) {
   const grade = p.grade_level === 'MBA' ? 'MBA' : p.grade_level ? `Grade ${p.grade_level}` : 'All grades'
@@ -44,6 +49,8 @@ export default function StudentHome() {
   const [retryPage, setRetryPage] = useState(0)
   const [sessionsPage, setSessionsPage] = useState(0)
   const [tab, setTab] = useState('todo')
+  const [showFeedbackSheet, setShowFeedbackSheet] = useState(false)
+  const [streakBurst, setStreakBurst] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -81,6 +88,20 @@ export default function StudentHome() {
     setWeeklySummary(null)
   }
 
+  useEffect(() => {
+    if (loading || streak === 0) return
+    const key = `streak_milestone_seen_${profile.id}`
+    const seen = parseInt(localStorage.getItem(key) ?? '0', 10)
+    const reached = STREAK_MILESTONES.filter(m => streak >= m && m > seen)
+    if (reached.length > 0) {
+      const highest = reached[reached.length - 1]
+      localStorage.setItem(key, String(highest))
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setStreakBurst(true)
+      feedback('celebrate')
+    }
+  }, [loading, streak, profile.id])
+
   const dailyLimitReached = dailyLimit !== null && todayCount >= dailyLimit
   const nextUp = dailyLimitReached
     ? null
@@ -100,6 +121,7 @@ export default function StudentHome() {
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
+      <Confetti active={streakBurst} />
       {weeklySummary && (
         <WeeklySummaryModal data={weeklySummary} streak={streak} onDismiss={dismissWeeklySummary} />
       )}
@@ -119,12 +141,28 @@ export default function StudentHome() {
                 🔥 {streak}-day streak
               </span>
             )}
-            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ml-auto ${
+            <button
+              type="button"
+              data-testid="feedback-settings-gear"
+              onClick={() => setShowFeedbackSheet(true)}
+              aria-label="Sound and haptics settings"
+              className="ml-auto text-slate-400 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 rounded p-1"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+            </button>
+            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
               dailyLimitReached ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-500'
             }`}>
               {dailyLimitReached ? 'Daily limit reached' : `${todayCount}/${dailyLimit} today`}
             </span>
           </div>
+        )}
+
+        {showFeedbackSheet && (
+          <FeedbackSettingsSheet onClose={() => setShowFeedbackSheet(false)} />
         )}
 
         {!loading && nextUp && (nextUp.type !== 'todo' || todoPage === 0) && (

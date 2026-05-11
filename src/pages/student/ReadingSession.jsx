@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/AuthContext'
 import { useAudioRecorder } from '../../hooks/useAudioRecorder'
 import { extractEdgeFunctionError } from '../../lib/edgeFunctionError'
+import { feedback } from '../../lib/feedback'
 
 export default function ReadingSession() {
   const { passageId } = useParams()
@@ -132,7 +133,7 @@ export default function ReadingSession() {
           <div className="flex gap-3 justify-center">
             {!recording && !audioBlob && (
               <button
-                onClick={startRecording}
+                onClick={() => { feedback('tap'); startRecording() }}
                 disabled={attemptCount >= 3 || dailyLimitReached}
                 className="bg-red-500 text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-red-600 transition-colors flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]"
               >
@@ -142,7 +143,7 @@ export default function ReadingSession() {
             )}
             {recording && (
               <button
-                onClick={stopRecording}
+                onClick={() => { feedback('tap'); stopRecording() }}
                 className="bg-slate-800 text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-slate-900 transition-colors min-h-[44px]"
               >
                 Stop Recording

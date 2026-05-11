@@ -1,1 +1,70 @@
 @import "tailwindcss";
+
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(-10vh) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(110vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+@keyframes card-pulse-correct {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+  50% {
+    transform: scale(1.03);
+    box-shadow: 0 0 0 8px rgba(16, 185, 129, 0.15);
+  }
+}
+
+@keyframes card-shake-wrong {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-6px);
+  }
+  40% {
+    transform: translateX(6px);
+  }
+  60% {
+    transform: translateX(-4px);
+  }
+  80% {
+    transform: translateX(4px);
+  }
+}
+
+@keyframes sheet-spring {
+  0% {
+    transform: translateY(100%);
+  }
+  70% {
+    transform: translateY(-8px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @keyframes confetti-fall {
+    0%, 100% { opacity: 0; }
+  }
+  @keyframes card-pulse-correct {
+    0%, 100% { transform: none; box-shadow: none; }
+  }
+  @keyframes card-shake-wrong {
+    0%, 100% { transform: none; }
+  }
+  @keyframes sheet-spring {
+    0%, 100% { transform: none; }
+  }
+}

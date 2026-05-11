@@ -9,9 +9,15 @@ vi.mock('react-router-dom', () => ({
 }))
 
 // vi.hoisted ensures these are available when the vi.mock factory runs
-const { mockRpc, capture } = vi.hoisted(() => ({
+const { mockRpc, capture, mockFeedback } = vi.hoisted(() => ({
   mockRpc: vi.fn(),
   capture: { questionsSelectArg: null },
+  mockFeedback: vi.fn(),
+}))
+
+vi.mock('../../lib/feedback', () => ({
+  feedback: (...args) => mockFeedback(...args),
+  prefersReducedMotion: () => false,
 }))
 
 vi.mock('../../lib/supabase', () => ({
@@ -57,6 +63,7 @@ describe('ComprehensionQuiz', () => {
     mockRpc.mockReset()
     mockRpc.mockResolvedValue({ data: null, error: null })
     capture.questionsSelectArg = null
+    mockFeedback.mockClear()
   })
 
   it('fetches questions without correct_index', async () => {
@@ -87,6 +94,17 @@ describe('ComprehensionQuiz', () => {
         { question_id: 'q2', selected_index: 2 },
       ],
     }))
+  })
+
+  it('fires feedback("swoosh") when the submit is confirmed', async () => {
+    render(<ComprehensionQuiz />)
+    await waitFor(() => screen.getByText('Who wrote Hamlet?'))
+    fireEvent.click(screen.getByLabelText('Shakespeare'))
+    fireEvent.click(screen.getByLabelText('1600'))
+    fireEvent.click(screen.getByRole('button', { name: /submit answers/i }))
+    await waitFor(() => screen.getByRole('dialog'))
+    fireEvent.click(screen.getByRole('button', { name: /^submit$/i }))
+    expect(mockFeedback).toHaveBeenCalledWith('swoosh')
   })
 
   it('navigates to report after successful submission', async () => {

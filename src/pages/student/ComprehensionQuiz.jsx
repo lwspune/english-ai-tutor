@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import QuizForm from '../../components/QuizForm'
+import { feedback } from '../../lib/feedback'
 
 export default function ComprehensionQuiz() {
   const { sessionId } = useParams()
@@ -51,6 +52,7 @@ export default function ComprehensionQuiz() {
   async function confirmSubmit() {
     setConfirming(false)
     setSubmitting(true)
+    feedback('swoosh')
     await supabase.rpc('grade_comprehension', {
       p_session_id: sessionId,
       p_answers: pendingAnswers,

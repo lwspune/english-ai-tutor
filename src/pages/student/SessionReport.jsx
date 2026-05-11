@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { WPM_TARGETS } from '../../lib/wpmTargets'
 import AudioPlayButton from '../../components/AudioPlayButton'
+import Confetti from '../../components/Confetti'
 import { buildRetentionQuiz } from '../../lib/vocabRetentionQuiz'
+import { feedback } from '../../lib/feedback'
 
 const VOCAB_GRADES = new Set(['11', '12', 'MBA'])
 const normalizeWord = (s) => s.toLowerCase().replace(/^[^a-z-]+|[^a-z-]+$/g, '')
@@ -20,6 +22,7 @@ function VocabSheet({ vocab, onClose }) {
       <div
         className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md p-5 space-y-3 shadow-xl"
         onClick={(e) => e.stopPropagation()}
+        style={{ animation: 'sheet-spring 320ms cubic-bezier(0.2, 1, 0.3, 1) forwards' }}
       >
         <div className="flex items-baseline justify-between gap-3">
           <div className="min-w-0">
@@ -153,6 +156,7 @@ export default function SessionReport() {
   const [retentionAnswers, setRetentionAnswers] = useState([])
   const [retentionSkipped, setRetentionSkipped] = useState(false)
   const [retentionDone, setRetentionDone] = useState(false)
+  const celebratedRef = useRef(false)
 
   useEffect(() => {
     async function load() {
@@ -203,6 +207,17 @@ export default function SessionReport() {
     load()
   }, [sessionId])
 
+  useEffect(() => {
+    if (celebratedRef.current) return
+    if (!session) return
+    const isNew = personalBest && (personalBest.newAccuracy || personalBest.newWpm)
+    const compAced = session.score_comprehension != null && session.score_comprehension >= 80
+    if (isNew || compAced) {
+      celebratedRef.current = true
+      feedback('celebrate')
+    }
+  }, [session, personalBest])
+
   if (!session) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -222,9 +237,12 @@ export default function SessionReport() {
   const substitutions = session.count_substitutions ?? words.filter(w => w.status === 'substitution').length
   const phrasing = session.score_phrasing ?? session.score_fluency ?? 0
   const isNewBest = personalBest && (personalBest.newAccuracy || personalBest.newWpm)
+  const comprehensionAced = session.score_comprehension != null && session.score_comprehension >= 80
+  const showCelebration = !!(isNewBest || comprehensionAced)
 
   return (
     <div className="min-h-screen bg-slate-50">
+      <Confetti active={showCelebration} />
       <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3">
         <button
           onClick={() => navigate('/student')}
@@ -286,6 +304,7 @@ export default function SessionReport() {
             if (answered) return
             setRetentionSelected(i)
             const wasCorrect = i === card.correctIndex
+            feedback(wasCorrect ? 'correct' : 'wrong')
             const answer = { word_id: card.word_id, selected_index: i, was_correct: wasCorrect }
             const allAnswers = [...retentionAnswers, answer]
             setRetentionAnswers(allAnswers)
@@ -333,11 +352,18 @@ export default function SessionReport() {
                     else if (isSelected) style = 'bg-red-50 border-red-400 text-red-800'
                     else style = 'bg-white border-slate-200 text-slate-400'
                   }
+                  const animation =
+                    answered && isSelected
+                      ? isCorrect
+                        ? 'card-pulse-correct 500ms ease-out 1'
+                        : 'card-shake-wrong 400ms ease-out 1'
+                      : undefined
                   return (
                     <button
                       key={i}
                       onClick={() => handleRetentionPick(i)}
                       disabled={answered}
+                      style={animation ? { animation } : undefined}
                       className={`w-full text-left text-sm border rounded-xl px-4 py-3 transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${style}`}
                     >
                       {opt}

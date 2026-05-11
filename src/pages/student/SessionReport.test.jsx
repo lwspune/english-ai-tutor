@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import SessionReport from './SessionReport'
 
 const mockNavigate = vi.fn()
@@ -37,7 +37,7 @@ const QUESTION = {
   display_order: 1,
 }
 
-const { sessionRef, prevSessionsRef, questionsRef, profileRef, vocabRef, progressRef, updateCalls, rpcCalls, rpcMock } = vi.hoisted(() => ({
+const { sessionRef, prevSessionsRef, questionsRef, profileRef, vocabRef, progressRef, updateCalls, rpcCalls, rpcMock, mockFeedback } = vi.hoisted(() => ({
   sessionRef: { data: null },
   prevSessionsRef: { data: [] },
   questionsRef: { data: [] },
@@ -47,6 +47,12 @@ const { sessionRef, prevSessionsRef, questionsRef, profileRef, vocabRef, progres
   updateCalls: { value: [] },
   rpcCalls: { value: [] },
   rpcMock: (...args) => { rpcCalls.value.push(args); return Promise.resolve({ data: {}, error: null }) },
+  mockFeedback: vi.fn(),
+}))
+
+vi.mock('../../lib/feedback', () => ({
+  feedback: (...args) => mockFeedback(...args),
+  prefersReducedMotion: () => false,
 }))
 
 vi.mock('../../lib/supabase', () => ({
@@ -110,6 +116,7 @@ beforeEach(() => {
   progressRef.data = []
   updateCalls.value = []
   rpcCalls.value = []
+  mockFeedback.mockClear()
 })
 
 // ─── Scores ───────────────────────────────────────────────────────────────────
@@ -363,5 +370,100 @@ describe('SessionReport — vocab retention quiz', () => {
     await waitFor(() => screen.getByTestId('retention-quiz'))
     await user.click(screen.getByRole('button', { name: /^skip$/i }))
     expect(screen.queryByTestId('retention-quiz')).not.toBeInTheDocument()
+  })
+
+  it('fires feedback("correct") on a correct retention answer', async () => {
+    const user = (await import('@testing-library/user-event')).default.setup()
+    profileRef.data = { grade: '11' }
+    vocabRef.data = [ABANDON, BRISK]
+    sessionRef.data = { ...BASE_SESSION, word_results: [{ word: 'Abandon', status: 'correct' }] }
+    // Lock RNG so the correct option (synonym 'forsake') is at a predictable index
+    const realRandom = Math.random
+    Math.random = () => 0.5
+    render(<SessionReport />)
+    await waitFor(() => screen.getByTestId('retention-quiz'))
+    const correct = screen.getByRole('button', { name: /^forsake$/i })
+    await user.click(correct)
+    expect(mockFeedback).toHaveBeenCalledWith('correct')
+    Math.random = realRandom
+  })
+
+  it('fires feedback("wrong") on an incorrect retention answer', async () => {
+    const user = (await import('@testing-library/user-event')).default.setup()
+    profileRef.data = { grade: '11' }
+    vocabRef.data = [ABANDON, BRISK]
+    sessionRef.data = { ...BASE_SESSION, word_results: [{ word: 'Abandon', status: 'correct' }] }
+    const realRandom = Math.random
+    Math.random = () => 0.5
+    render(<SessionReport />)
+    await waitFor(() => screen.getByTestId('retention-quiz'))
+    // Scope to retention quiz card; pick any option that is NOT a synonym of "Abandon"
+    const quiz = screen.getByTestId('retention-quiz')
+    const ABANDON_SYNS = ['forsake', 'desert']
+    const optionButtons = within(quiz)
+      .getAllByRole('button')
+      .filter((b) => !/^skip$/i.test(b.textContent.trim()))
+    const wrongOption = optionButtons.find(
+      (b) => !ABANDON_SYNS.includes(b.textContent.trim().toLowerCase()),
+    )
+    await user.click(wrongOption)
+    expect(mockFeedback).toHaveBeenCalledWith('wrong')
+    Math.random = realRandom
+  })
+})
+
+// ─── Confetti celebrations ────────────────────────────────────────────────────
+
+describe('SessionReport — celebrations', () => {
+  it('shows confetti when personal best banner appears', async () => {
+    prevSessionsRef.data = [{ score_accuracy: 70, score_wpm: 130 }]
+    render(<SessionReport />)
+    await waitFor(() => screen.getByText(/new personal best/i))
+    await waitFor(() => expect(screen.getByTestId('confetti')).toBeInTheDocument())
+  })
+
+  it('does NOT show confetti when there is no personal best', async () => {
+    prevSessionsRef.data = [{ score_accuracy: 95, score_wpm: 200 }]
+    render(<SessionReport />)
+    await waitFor(() => screen.getByText('Test Passage'))
+    expect(screen.queryByTestId('confetti')).not.toBeInTheDocument()
+  })
+
+  it('shows confetti when comprehension score is ≥80%', async () => {
+    sessionRef.data = {
+      ...BASE_SESSION,
+      score_comprehension: 100,
+      comprehension_answers: [{ question_id: 'q1', selected_index: 0, is_correct: true }],
+    }
+    questionsRef.data = [QUESTION]
+    render(<SessionReport />)
+    await waitFor(() => screen.getByText('100%'))
+    await waitFor(() => expect(screen.getByTestId('confetti')).toBeInTheDocument())
+  })
+
+  it('does NOT show confetti when comprehension is below 80%', async () => {
+    sessionRef.data = {
+      ...BASE_SESSION,
+      score_comprehension: 50,
+      comprehension_answers: [{ question_id: 'q1', selected_index: 1, is_correct: false }],
+    }
+    questionsRef.data = [QUESTION]
+    render(<SessionReport />)
+    await waitFor(() => screen.getByText('50%'))
+    expect(screen.queryByTestId('confetti')).not.toBeInTheDocument()
+  })
+
+  it('fires feedback("celebrate") on a celebrated session', async () => {
+    prevSessionsRef.data = [{ score_accuracy: 70, score_wpm: 130 }]
+    render(<SessionReport />)
+    await waitFor(() => screen.getByText(/new personal best/i))
+    expect(mockFeedback).toHaveBeenCalledWith('celebrate')
+  })
+
+  it('does NOT fire feedback("celebrate") on a non-celebrated session', async () => {
+    prevSessionsRef.data = [{ score_accuracy: 95, score_wpm: 200 }]
+    render(<SessionReport />)
+    await waitFor(() => screen.getByText('Test Passage'))
+    expect(mockFeedback).not.toHaveBeenCalledWith('celebrate')
   })
 })

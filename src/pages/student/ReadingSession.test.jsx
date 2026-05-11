@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import ReadingSession from './ReadingSession'
+
+const { mockFeedback } = vi.hoisted(() => ({ mockFeedback: vi.fn() }))
+vi.mock('../../lib/feedback', () => ({
+  feedback: (...args) => mockFeedback(...args),
+  prefersReducedMotion: () => false,
+}))
 
 const mockNavigate = vi.fn()
 vi.mock('react-router-dom', () => ({
@@ -81,6 +87,7 @@ beforeEach(() => {
   mockRecorderState.audioBlob = null
   mockRecorderState.autoStopped = false
   mockRecorderState.remaining = 180
+  mockFeedback.mockClear()
 })
 
 // ─── Daily limit ──────────────────────────────────────────────────────────────
@@ -147,5 +154,20 @@ describe('ReadingSession — recording indicator', () => {
     render(<ReadingSession />)
     await waitFor(() => screen.getByRole('button', { name: /start recording/i }))
     expect(screen.queryByTestId('recording-pulse')).not.toBeInTheDocument()
+  })
+
+  it('fires feedback("tap") when Start Recording is clicked', async () => {
+    render(<ReadingSession />)
+    await waitFor(() => screen.getByRole('button', { name: /start recording/i }))
+    fireEvent.click(screen.getByRole('button', { name: /start recording/i }))
+    expect(mockFeedback).toHaveBeenCalledWith('tap')
+  })
+
+  it('fires feedback("tap") when Stop Recording is clicked', async () => {
+    mockRecorderState.recording = true
+    render(<ReadingSession />)
+    await waitFor(() => screen.getByRole('button', { name: /stop recording/i }))
+    fireEvent.click(screen.getByRole('button', { name: /stop recording/i }))
+    expect(mockFeedback).toHaveBeenCalledWith('tap')
   })
 })

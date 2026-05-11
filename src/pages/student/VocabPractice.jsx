@@ -4,8 +4,11 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/AuthContext'
 import BottomNav from '../../components/BottomNav'
 import AudioPlayButton from '../../components/AudioPlayButton'
+import Confetti from '../../components/Confetti'
 import { assembleDeck } from '../../lib/vocabDeck'
 import { buildPracticeCards } from '../../lib/vocabPracticeCard'
+import { feedback } from '../../lib/feedback'
+import { MAX_BOX, MASTERY_CORRECT_THRESHOLD } from '../../lib/srs'
 
 export default function VocabPractice() {
   const { profile } = useAuth()
@@ -16,6 +19,8 @@ export default function VocabPractice() {
   const [cardIndex, setCardIndex] = useState(0)
   const [selectedIndex, setSelectedIndex] = useState(null)
   const [correctCount, setCorrectCount] = useState(0)
+  const [progressMap, setProgressMap] = useState(new Map())
+  const [masteryBurst, setMasteryBurst] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -27,11 +32,22 @@ export default function VocabPractice() {
 
       const deck = assembleDeck(progress ?? [], allWords ?? [], new Date())
       const built = buildPracticeCards(deck, allWords ?? [])
+      const map = new Map()
+      for (const row of progress ?? []) map.set(row.word_id, row)
+      setProgressMap(map)
       setCards(built)
       setLoading(false)
     }
     load()
   }, [profile.id])
+
+  function wouldMasterOnCorrect(wordId) {
+    const before = progressMap.get(wordId)
+    if (before && before.mastered_at) return false
+    const oldBox = before?.srs_box ?? 1
+    const oldCount = before?.correct_count ?? 0
+    return oldBox >= MAX_BOX - 1 && oldCount + 1 >= MASTERY_CORRECT_THRESHOLD
+  }
 
   const card = cards[cardIndex]
   const answered = selectedIndex !== null
@@ -41,17 +57,26 @@ export default function VocabPractice() {
     if (answered) return
     setSelectedIndex(i)
     const isCorrect = i === card.correctIndex
+    const willMaster = isCorrect && wouldMasterOnCorrect(card.word_id)
+    if (willMaster) {
+      setMasteryBurst(true)
+      feedback('celebrate')
+    } else {
+      feedback(isCorrect ? 'correct' : 'wrong')
+    }
     if (isCorrect) setCorrectCount(c => c + 1)
     await supabase.rpc('grade_vocab_attempt', { p_word_id: card.word_id, p_was_correct: isCorrect })
   }
 
   function handleNext() {
     setSelectedIndex(null)
+    setMasteryBurst(false)
     setCardIndex(i => i + 1)
   }
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
+      <Confetti active={masteryBurst} />
       <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3">
         <button
           onClick={() => navigate('/student/vocab')}
@@ -121,12 +146,19 @@ export default function VocabPractice() {
                     else if (isSelected) style = 'bg-red-50 border-red-400 text-red-800'
                     else style = 'bg-white border-slate-200 text-slate-400'
                   }
+                  const animation =
+                    answered && isSelected
+                      ? isCorrect
+                        ? 'card-pulse-correct 500ms ease-out 1'
+                        : 'card-shake-wrong 400ms ease-out 1'
+                      : undefined
                   return (
                     <button
                       key={i}
                       data-testid={`option-${i}`}
                       onClick={() => handleSelect(i)}
                       disabled={answered}
+                      style={animation ? { animation } : undefined}
                       className={`w-full text-left text-sm border rounded-xl px-4 py-3 transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${style}`}
                     >
                       {opt}

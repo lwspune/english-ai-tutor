@@ -433,3 +433,83 @@ describe('StudentHome — recent sessions pagination', () => {
     expect(document.querySelectorAll('[data-testid="session-row"]')).toHaveLength(3)
   })
 })
+
+// ─── Streak milestone confetti ────────────────────────────────────────────────
+
+describe('StudentHome — streak milestones', () => {
+  it('shows confetti when student crosses a 5-day milestone for the first time', async () => {
+    mockComputeStreak.mockReturnValue(5)
+    passagesRef.data = [GRADE_10_PASSAGE]
+    sessionsRef.data = []
+    render(<StudentHome />)
+    await waitFor(() => expect(screen.getByTestId('confetti')).toBeInTheDocument())
+  })
+
+  it('does NOT show confetti when the milestone has already been seen', async () => {
+    mockComputeStreak.mockReturnValue(5)
+    localStorage.setItem('streak_milestone_seen_student-1', '5')
+    passagesRef.data = [GRADE_10_PASSAGE]
+    sessionsRef.data = []
+    render(<StudentHome />)
+    await waitFor(() => screen.getByText(/5-day streak/i))
+    expect(screen.queryByTestId('confetti')).not.toBeInTheDocument()
+  })
+
+  it('does NOT show confetti for a non-milestone streak (e.g. 7)', async () => {
+    mockComputeStreak.mockReturnValue(7)
+    passagesRef.data = [GRADE_10_PASSAGE]
+    sessionsRef.data = []
+    render(<StudentHome />)
+    await waitFor(() => screen.getByText(/7-day streak/i))
+    expect(screen.queryByTestId('confetti')).not.toBeInTheDocument()
+  })
+
+  it('shows confetti when crossing 10 with previously-seen 5', async () => {
+    mockComputeStreak.mockReturnValue(10)
+    localStorage.setItem('streak_milestone_seen_student-1', '5')
+    passagesRef.data = [GRADE_10_PASSAGE]
+    sessionsRef.data = []
+    render(<StudentHome />)
+    await waitFor(() => expect(screen.getByTestId('confetti')).toBeInTheDocument())
+  })
+
+  it('does NOT show confetti when streak is 0', async () => {
+    mockComputeStreak.mockReturnValue(0)
+    passagesRef.data = [GRADE_10_PASSAGE]
+    sessionsRef.data = []
+    render(<StudentHome />)
+    await waitFor(() => screen.getByText(/Next Up/i))
+    expect(screen.queryByTestId('confetti')).not.toBeInTheDocument()
+  })
+})
+
+// ─── Feedback settings (gear icon → sheet) ────────────────────────────────────
+
+describe('StudentHome — feedback settings', () => {
+  it('renders a gear button in the status bar', async () => {
+    passagesRef.data = [GRADE_10_PASSAGE]
+    sessionsRef.data = []
+    render(<StudentHome />)
+    await waitFor(() => screen.getByTestId('feedback-settings-gear'))
+    expect(screen.getByTestId('feedback-settings-gear')).toBeInTheDocument()
+  })
+
+  it('clicking the gear opens the FeedbackSettingsSheet', async () => {
+    passagesRef.data = [GRADE_10_PASSAGE]
+    sessionsRef.data = []
+    render(<StudentHome />)
+    await waitFor(() => screen.getByTestId('feedback-settings-gear'))
+    fireEvent.click(screen.getByTestId('feedback-settings-gear'))
+    expect(screen.getByTestId('toggle-sound')).toBeInTheDocument()
+  })
+
+  it('Done closes the sheet', async () => {
+    passagesRef.data = [GRADE_10_PASSAGE]
+    sessionsRef.data = []
+    render(<StudentHome />)
+    await waitFor(() => screen.getByTestId('feedback-settings-gear'))
+    fireEvent.click(screen.getByTestId('feedback-settings-gear'))
+    fireEvent.click(screen.getByRole('button', { name: /done/i }))
+    expect(screen.queryByTestId('toggle-sound')).not.toBeInTheDocument()
+  })
+})

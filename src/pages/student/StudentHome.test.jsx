@@ -18,8 +18,18 @@ vi.mock('../../components/BottomNav', () => ({
   default: () => <div data-testid="bottom-nav" />,
 }))
 
-const { mockComputeStreak } = vi.hoisted(() => ({
+const { mockComputeStreak, mockAwardMilestone } = vi.hoisted(() => ({
   mockComputeStreak: vi.fn(() => 0),
+  mockAwardMilestone: vi.fn(() => Promise.resolve('milestone-id')),
+}))
+
+vi.mock('../../lib/milestones', () => ({
+  awardMilestone: (...args) => mockAwardMilestone(...args),
+  MILESTONE_KIND: {
+    STREAK_5: 'streak_5',
+    STREAK_10: 'streak_10',
+    STREAK_20: 'streak_20',
+  },
 }))
 
 vi.mock('../../lib/streak', () => ({
@@ -94,6 +104,8 @@ beforeEach(() => {
   mockPassagesOr.mockClear()
   mockNavigate.mockReset()
   mockComputeStreak.mockReturnValue(0)
+  mockAwardMilestone.mockClear()
+  mockAwardMilestone.mockResolvedValue('milestone-id')
   passagesRef.data = [GRADE_10_PASSAGE, ALL_GRADES_PASSAGE]
   sessionsRef.data = []
   localStorage.clear()
@@ -443,6 +455,33 @@ describe('StudentHome — streak milestones', () => {
     sessionsRef.data = []
     render(<StudentHome />)
     await waitFor(() => expect(screen.getByTestId('confetti')).toBeInTheDocument())
+  })
+
+  it('calls awardMilestone("streak_5") when crossing 5-day for the first time', async () => {
+    mockComputeStreak.mockReturnValue(5)
+    passagesRef.data = [GRADE_10_PASSAGE]
+    sessionsRef.data = []
+    render(<StudentHome />)
+    await waitFor(() => expect(mockAwardMilestone).toHaveBeenCalledWith('streak_5', {}))
+  })
+
+  it('calls awardMilestone("streak_10") when crossing 10-day (with 5 already seen)', async () => {
+    mockComputeStreak.mockReturnValue(10)
+    localStorage.setItem('streak_milestone_seen_student-1', '5')
+    passagesRef.data = [GRADE_10_PASSAGE]
+    sessionsRef.data = []
+    render(<StudentHome />)
+    await waitFor(() => expect(mockAwardMilestone).toHaveBeenCalledWith('streak_10', {}))
+  })
+
+  it('does NOT call awardMilestone when milestone already seen', async () => {
+    mockComputeStreak.mockReturnValue(5)
+    localStorage.setItem('streak_milestone_seen_student-1', '5')
+    passagesRef.data = [GRADE_10_PASSAGE]
+    sessionsRef.data = []
+    render(<StudentHome />)
+    await waitFor(() => screen.getByText(/5-day streak/i))
+    expect(mockAwardMilestone).not.toHaveBeenCalled()
   })
 
   it('does NOT show confetti when the milestone has already been seen', async () => {

@@ -5,21 +5,28 @@ import { useAuth } from '../../lib/AuthContext'
 import { MetricCard } from '../../components/PerformanceCharts'
 import { WPM_TARGETS } from '../../lib/wpmTargets'
 import BottomNav from '../../components/BottomNav'
+import MilestoneList from '../../components/MilestoneList'
+import { fetchRecentMilestones } from '../../lib/milestones'
 
 export default function StudentProgress() {
   const { profile } = useAuth()
   const navigate = useNavigate()
   const [sessions, setSessions] = useState([])
+  const [milestones, setMilestones] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase
-        .from('sessions')
-        .select('score_accuracy, score_wpm, score_phrasing, score_fluency, score_comprehension, created_at')
-        .eq('student_id', profile.id)
-        .order('created_at', { ascending: true })
-      setSessions(data ?? [])
+      const [{ data: s }, ms] = await Promise.all([
+        supabase
+          .from('sessions')
+          .select('score_accuracy, score_wpm, score_phrasing, score_fluency, score_comprehension, created_at')
+          .eq('student_id', profile.id)
+          .order('created_at', { ascending: true }),
+        fetchRecentMilestones(profile.id, 10),
+      ])
+      setSessions(s ?? [])
+      setMilestones(ms)
       setLoading(false)
     }
     load()
@@ -109,6 +116,7 @@ export default function StudentProgress() {
                 unit="%"
               />
             )}
+            <MilestoneList milestones={milestones} />
           </>
         )}
       </main>

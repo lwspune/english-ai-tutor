@@ -12,17 +12,23 @@ vi.mock('../../components/BottomNav', () => ({
   default: () => <div data-testid="bottom-nav" />,
 }))
 
-const { mockProfile, mockWords, mockProgress, mockRpc, mockFeedback } = vi.hoisted(() => ({
+const { mockProfile, mockWords, mockProgress, mockRpc, mockFeedback, mockAwardMilestone } = vi.hoisted(() => ({
   mockProfile: { value: { id: 's1', grade: '11' } },
   mockWords: { value: [] },
   mockProgress: { value: [] },
   mockRpc: vi.fn(() => Promise.resolve({ data: {}, error: null })),
   mockFeedback: vi.fn(),
+  mockAwardMilestone: vi.fn(() => Promise.resolve('milestone-id')),
 }))
 
 vi.mock('../../lib/feedback', () => ({
   feedback: (...args) => mockFeedback(...args),
   prefersReducedMotion: () => false,
+}))
+
+vi.mock('../../lib/milestones', () => ({
+  awardMilestone: (...args) => mockAwardMilestone(...args),
+  MILESTONE_KIND: { WORD_MASTERED: 'word_mastered' },
 }))
 
 vi.mock('../../lib/AuthContext', () => ({
@@ -92,6 +98,8 @@ beforeEach(() => {
   mockRpc.mockResolvedValue({ data: {}, error: null })
   mockNavigate.mockReset()
   mockFeedback.mockClear()
+  mockAwardMilestone.mockClear()
+  mockAwardMilestone.mockResolvedValue('milestone-id')
 })
 
 afterEach(() => {
@@ -210,6 +218,26 @@ describe('VocabPractice', () => {
     await user.click(screen.getByRole('button', { name: /^forsake$/i }))
     await waitFor(() => expect(screen.getByTestId('confetti')).toBeInTheDocument())
     expect(mockFeedback).toHaveBeenCalledWith('celebrate')
+  })
+
+  it('awards word_mastered milestone on the tipping-point correct answer', async () => {
+    const user = userEvent.setup()
+    mockProgress.value = [
+      { word_id: 'w1', srs_box: 4, correct_count: 2, mastered_at: null, next_review_at: '2026-04-01T00:00:00Z' },
+    ]
+    render(<VocabPractice />)
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Abandon' })).toBeInTheDocument())
+    await user.click(screen.getByRole('button', { name: /^forsake$/i }))
+    await waitFor(() => expect(mockAwardMilestone).toHaveBeenCalledWith('word_mastered', { word_id: 'w1' }))
+  })
+
+  it('does NOT award word_mastered on a non-tipping correct answer', async () => {
+    const user = userEvent.setup()
+    mockProgress.value = []
+    render(<VocabPractice />)
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Abandon' })).toBeInTheDocument())
+    await user.click(screen.getByRole('button', { name: /^forsake$/i }))
+    expect(mockAwardMilestone).not.toHaveBeenCalled()
   })
 
   it('does NOT show mastery confetti on a new word (no tipping point)', async () => {

@@ -6,6 +6,7 @@ import AudioPlayButton from '../../components/AudioPlayButton'
 import Confetti from '../../components/Confetti'
 import { buildRetentionQuiz } from '../../lib/vocabRetentionQuiz'
 import { feedback } from '../../lib/feedback'
+import { awardMilestone } from '../../lib/milestones'
 
 const VOCAB_GRADES = new Set(['11', '12', 'MBA'])
 const normalizeWord = (s) => s.toLowerCase().replace(/^[^a-z-]+|[^a-z-]+$/g, '')
@@ -210,11 +211,15 @@ export default function SessionReport() {
   useEffect(() => {
     if (celebratedRef.current) return
     if (!session) return
-    const isNew = personalBest && (personalBest.newAccuracy || personalBest.newWpm)
+    const isNewAcc = personalBest?.newAccuracy
+    const isNewWpm = personalBest?.newWpm
     const compAced = session.score_comprehension != null && session.score_comprehension >= 80
-    if (isNew || compAced) {
+    if (isNewAcc || isNewWpm || compAced) {
       celebratedRef.current = true
       feedback('celebrate')
+      if (isNewAcc) awardMilestone('personal_best_accuracy', { session_id: session.id })
+      if (isNewWpm) awardMilestone('personal_best_wpm', { session_id: session.id })
+      if (compAced) awardMilestone('comprehension_aced', { session_id: session.id })
     }
   }, [session, personalBest])
 

@@ -12,6 +12,7 @@ import BottomNav from '../../components/BottomNav'
 import FeedbackSettingsSheet from '../../components/FeedbackSettingsSheet'
 import Confetti from '../../components/Confetti'
 import { feedback } from '../../lib/feedback'
+import { awardMilestone } from '../../lib/milestones'
 
 const STREAK_MILESTONES = [5, 10, 20]
 
@@ -99,6 +100,9 @@ export default function StudentHome() {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setStreakBurst(true)
       feedback('celebrate')
+      for (const m of reached) {
+        awardMilestone(`streak_${m}`, {})
+      }
     }
   }, [loading, streak, profile.id])
 

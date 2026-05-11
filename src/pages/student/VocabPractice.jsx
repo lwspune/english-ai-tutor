@@ -8,6 +8,7 @@ import Confetti from '../../components/Confetti'
 import { assembleDeck } from '../../lib/vocabDeck'
 import { buildPracticeCards } from '../../lib/vocabPracticeCard'
 import { feedback } from '../../lib/feedback'
+import { awardMilestone } from '../../lib/milestones'
 import { MAX_BOX, MASTERY_CORRECT_THRESHOLD } from '../../lib/srs'
 
 export default function VocabPractice() {
@@ -66,6 +67,9 @@ export default function VocabPractice() {
     }
     if (isCorrect) setCorrectCount(c => c + 1)
     await supabase.rpc('grade_vocab_attempt', { p_word_id: card.word_id, p_was_correct: isCorrect })
+    if (willMaster) {
+      awardMilestone('word_mastered', { word_id: card.word_id })
+    }
   }
 
   function handleNext() {

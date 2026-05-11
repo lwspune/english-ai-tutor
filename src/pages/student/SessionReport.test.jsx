@@ -37,7 +37,7 @@ const QUESTION = {
   display_order: 1,
 }
 
-const { sessionRef, prevSessionsRef, questionsRef, profileRef, vocabRef, progressRef, updateCalls, rpcCalls, rpcMock, mockFeedback } = vi.hoisted(() => ({
+const { sessionRef, prevSessionsRef, questionsRef, profileRef, vocabRef, progressRef, updateCalls, rpcCalls, rpcMock, mockFeedback, mockAwardMilestone } = vi.hoisted(() => ({
   sessionRef: { data: null },
   prevSessionsRef: { data: [] },
   questionsRef: { data: [] },
@@ -48,11 +48,21 @@ const { sessionRef, prevSessionsRef, questionsRef, profileRef, vocabRef, progres
   rpcCalls: { value: [] },
   rpcMock: (...args) => { rpcCalls.value.push(args); return Promise.resolve({ data: {}, error: null }) },
   mockFeedback: vi.fn(),
+  mockAwardMilestone: vi.fn(() => Promise.resolve('milestone-id')),
 }))
 
 vi.mock('../../lib/feedback', () => ({
   feedback: (...args) => mockFeedback(...args),
   prefersReducedMotion: () => false,
+}))
+
+vi.mock('../../lib/milestones', () => ({
+  awardMilestone: (...args) => mockAwardMilestone(...args),
+  MILESTONE_KIND: {
+    PERSONAL_BEST_ACCURACY: 'personal_best_accuracy',
+    PERSONAL_BEST_WPM: 'personal_best_wpm',
+    COMPREHENSION_ACED: 'comprehension_aced',
+  },
 }))
 
 vi.mock('../../lib/supabase', () => ({
@@ -117,6 +127,8 @@ beforeEach(() => {
   updateCalls.value = []
   rpcCalls.value = []
   mockFeedback.mockClear()
+  mockAwardMilestone.mockClear()
+  mockAwardMilestone.mockResolvedValue('milestone-id')
 })
 
 // ─── Scores ───────────────────────────────────────────────────────────────────
@@ -465,5 +477,38 @@ describe('SessionReport — celebrations', () => {
     render(<SessionReport />)
     await waitFor(() => screen.getByText('Test Passage'))
     expect(mockFeedback).not.toHaveBeenCalledWith('celebrate')
+  })
+
+  it('awards personal_best_accuracy milestone when accuracy is a new record', async () => {
+    prevSessionsRef.data = [{ score_accuracy: 70, score_wpm: 200 }]
+    render(<SessionReport />)
+    await waitFor(() => screen.getByText(/new personal best/i))
+    await waitFor(() => expect(mockAwardMilestone).toHaveBeenCalledWith('personal_best_accuracy', { session_id: 'session-1' }))
+  })
+
+  it('awards personal_best_wpm milestone when WPM is a new record', async () => {
+    prevSessionsRef.data = [{ score_accuracy: 95, score_wpm: 130 }]
+    render(<SessionReport />)
+    await waitFor(() => screen.getByText(/new personal best/i))
+    await waitFor(() => expect(mockAwardMilestone).toHaveBeenCalledWith('personal_best_wpm', { session_id: 'session-1' }))
+  })
+
+  it('awards comprehension_aced milestone when score is >=80', async () => {
+    sessionRef.data = {
+      ...BASE_SESSION,
+      score_comprehension: 90,
+      comprehension_answers: [{ question_id: 'q1', selected_index: 0, is_correct: true }],
+    }
+    questionsRef.data = [QUESTION]
+    render(<SessionReport />)
+    await waitFor(() => screen.getByText('90%'))
+    await waitFor(() => expect(mockAwardMilestone).toHaveBeenCalledWith('comprehension_aced', { session_id: 'session-1' }))
+  })
+
+  it('does NOT award any milestone on a vanilla session', async () => {
+    prevSessionsRef.data = [{ score_accuracy: 95, score_wpm: 200 }]
+    render(<SessionReport />)
+    await waitFor(() => screen.getByText('Test Passage'))
+    expect(mockAwardMilestone).not.toHaveBeenCalled()
   })
 })

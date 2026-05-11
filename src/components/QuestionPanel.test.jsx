@@ -25,7 +25,7 @@ describe('QuestionPanel', () => {
     expect(inputs).toHaveLength(4)
   })
 
-  it('calls onSave with question data when form is submitted', () => {
+  it('calls onSave with shuffled options, preserving the correct answer text', () => {
     const onSave = vi.fn()
     render(<QuestionPanel questions={[]} onSave={onSave} onDelete={vi.fn()} />)
 
@@ -38,11 +38,29 @@ describe('QuestionPanel', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: /add question/i }))
 
-    expect(onSave).toHaveBeenCalledWith({
-      question_text: 'Who is the protagonist?',
-      options: ['Option 0', 'Option 1', 'Option 2', 'Option 3'],
-      correct_index: 0,
-    })
+    expect(onSave).toHaveBeenCalledTimes(1)
+    const payload = onSave.mock.calls[0][0]
+    expect(payload.question_text).toBe('Who is the protagonist?')
+    expect(payload.options).toHaveLength(4)
+    expect([...payload.options].sort()).toEqual(['Option 0', 'Option 1', 'Option 2', 'Option 3'])
+    // correct index 0 was 'Option 0' before shuffle — must still point at it after
+    expect(payload.options[payload.correct_index]).toBe('Option 0')
+  })
+
+  it('reshuffles option positions across many submits (not always the same order)', () => {
+    const onSave = vi.fn()
+    const seen = new Set()
+    for (let i = 0; i < 30; i++) {
+      const { unmount } = render(<QuestionPanel questions={[]} onSave={onSave} onDelete={vi.fn()} />)
+      fireEvent.change(screen.getByPlaceholderText('Question text'), { target: { value: 'q' } })
+      screen.getAllByPlaceholderText(/Option [A-D]/).forEach((input, j) => {
+        fireEvent.change(input, { target: { value: `O${j}` } })
+      })
+      fireEvent.click(screen.getByRole('button', { name: /add question/i }))
+      seen.add(onSave.mock.calls.at(-1)[0].options.join(','))
+      unmount()
+    }
+    expect(seen.size).toBeGreaterThan(1)
   })
 
   it('calls onDelete when delete is clicked', () => {

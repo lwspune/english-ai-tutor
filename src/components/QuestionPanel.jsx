@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { shuffleOptions } from '../lib/shuffleQuestionOptions'
 
 const EMPTY_FORM = { question_text: '', options: ['', '', '', ''], correct_index: 0 }
 
@@ -28,7 +29,8 @@ export default function QuestionPanel({ questions, onSave, onDelete, onUpdate })
 
   function handleSubmit(e) {
     e.preventDefault()
-    const data = { question_text: form.question_text, options: form.options, correct_index: form.correct_index }
+    const shuffled = shuffleOptions({ options: form.options, correct_index: form.correct_index })
+    const data = { question_text: form.question_text, options: shuffled.options, correct_index: shuffled.correct_index }
     if (editingId) {
       onUpdate(editingId, data)
       setEditingId(null)

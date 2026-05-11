@@ -1,0 +1,31 @@
+{
+  "version": "ie-v1",
+  "description": "Indian English L1-influenced phoneme tolerances. Drafted from published IE phonology references (Wells 1982; Sailaja 2009; Gargesh 2004). Word-level forced alignment treats these as 'accent_tolerated' rather than substitutions/omissions. Per-phoneme grading is NOT exposed to students; this ruleset only affects whether a word with low per-phoneme confidence is bumped back to 'correct'.",
+  "tolerated_substitutions": [
+    { "expected": "th_voiceless", "ipa_expected": "θ", "alternates": ["t", "d̪"], "examples": ["thin→tin", "three→tree", "thought→tought"], "note": "th-stopping; very common in IE" },
+    { "expected": "th_voiced",    "ipa_expected": "ð", "alternates": ["d̪", "d"], "examples": ["this→dis", "that→dat", "these→deese"], "note": "th-stopping (voiced); near-universal in IE" },
+    { "expected": "v",            "ipa_expected": "v", "alternates": ["w", "ʋ"], "examples": ["very→wery", "video→wideo"], "note": "v/w merger, especially word-initial" },
+    { "expected": "w",            "ipa_expected": "w", "alternates": ["v", "ʋ"], "examples": ["world→vorld", "water→vater"], "note": "v/w merger (reverse direction)" },
+    { "expected": "z",            "ipa_expected": "z", "alternates": ["s", "dʒ"], "examples": ["busy→busi", "zoo→soo"], "note": "z often devoiced or merged with s" },
+    { "expected": "ae",           "ipa_expected": "æ", "alternates": ["ɛ", "a", "e"], "examples": ["back→bek", "cat→ket"], "note": "TRAP vowel often merged toward DRESS or open central" },
+    { "expected": "schwa_stressed", "ipa_expected": "ə", "alternates": ["ʌ", "a", "ɔ"], "examples": ["about→ah-bout"], "note": "stressed schwa often pronounced as full vowel; syllable-timed" },
+    { "expected": "r_postvocalic", "ipa_expected": "ɹ", "alternates": ["ɾ", "r", null], "examples": ["car→ka", "father→fadar"], "note": "rhoticity varies; non-rhotic acceptable, retroflex tap acceptable" },
+    { "expected": "t_alveolar",   "ipa_expected": "t", "alternates": ["ʈ"], "examples": ["time→ʈime"], "note": "retroflex realization of /t/ — common, not an error" },
+    { "expected": "d_alveolar",   "ipa_expected": "d", "alternates": ["ɖ"], "examples": ["day→ɖay"], "note": "retroflex realization of /d/" },
+    { "expected": "sh",           "ipa_expected": "ʃ", "alternates": ["s"], "examples": ["ship→sip"], "note": "occasional merger; less common but documented" }
+  ],
+  "tolerated_insertions": [
+    { "context": "consonant_cluster_initial", "phoneme": "ɪ", "examples": ["school→iskool", "speak→ispeak"], "note": "epenthetic vowel before /s/ + stop clusters" },
+    { "context": "consonant_cluster_final",   "phoneme": "ə", "examples": ["film→filum"], "note": "epenthetic vowel breaking complex codas" }
+  ],
+  "tolerated_stress_shifts": {
+    "description": "Stress placement is often L1-influenced and varies widely; word-level scoring should NOT penalise non-target stress placement when phoneme content is otherwise correct.",
+    "policy": "ignore_stress"
+  },
+  "notes_for_reviewers": [
+    "This ruleset is intentionally permissive — the design philosophy is 'when ambiguous, favour correct'.",
+    "Phoneme-level penalties are not applied to student-visible accuracy scores. Words flagged as 'accent_tolerated' count as correct.",
+    "Outright wrong words (different word entirely) are still caught by word-level alignment regardless of this ruleset.",
+    "Tune by adding rules that the shadow-mode comparison reveals are over-flagged — never by removing rules."
+  ]
+}

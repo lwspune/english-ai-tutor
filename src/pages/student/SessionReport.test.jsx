@@ -37,10 +37,12 @@ const QUESTION = {
   display_order: 1,
 }
 
-const { sessionRef, prevSessionsRef, questionsRef } = vi.hoisted(() => ({
+const { sessionRef, prevSessionsRef, questionsRef, profileRef, vocabRef } = vi.hoisted(() => ({
   sessionRef: { data: null },
   prevSessionsRef: { data: [] },
   questionsRef: { data: [] },
+  profileRef: { data: { grade: 10 } },
+  vocabRef: { data: [] },
 }))
 
 vi.mock('../../lib/supabase', () => ({
@@ -64,12 +66,17 @@ vi.mock('../../lib/supabase', () => ({
       }
       if (table === 'profiles') {
         return {
-          select: () => ({ eq: () => ({ single: () => Promise.resolve({ data: { grade: 10 } }) }) }),
+          select: () => ({ eq: () => ({ single: () => Promise.resolve({ data: profileRef.data }) }) }),
         }
       }
       if (table === 'questions') {
         return {
           select: () => ({ eq: () => ({ order: () => Promise.resolve({ data: questionsRef.data }) }) }),
+        }
+      }
+      if (table === 'vocabulary_words') {
+        return {
+          select: () => Promise.resolve({ data: vocabRef.data }),
         }
       }
       return {}
@@ -82,6 +89,8 @@ beforeEach(() => {
   sessionRef.data = { ...BASE_SESSION }
   prevSessionsRef.data = []
   questionsRef.data = []
+  profileRef.data = { grade: 10 }
+  vocabRef.data = []
 })
 
 // ─── Scores ───────────────────────────────────────────────────────────────────
@@ -193,5 +202,81 @@ describe('SessionReport — feedback', () => {
     sessionRef.data = { ...BASE_SESSION, feedback: 'Keep practising your phrasing.' }
     render(<SessionReport />)
     await waitFor(() => screen.getByText('Keep practising your phrasing.'))
+  })
+})
+
+// ─── Vocab highlight + tap-to-define (v2.1) ────────────────────────────────
+
+describe('SessionReport — vocab highlight', () => {
+  const VOCAB = {
+    word: 'World',
+    part_of_speech: 'noun',
+    definition: 'The earth, together with all of its peoples and natural features.',
+    example_sentence: 'They travelled around the world.',
+  }
+
+  it('does not highlight vocab words for grade 10 (gated)', async () => {
+    profileRef.data = { grade: '10' }
+    vocabRef.data = [VOCAB]
+    render(<SessionReport />)
+    await waitFor(() => screen.getByText('Hello'))
+    expect(screen.queryByTestId('vocab-word-world')).not.toBeInTheDocument()
+  })
+
+  it('highlights matching vocab words for grade 11 students', async () => {
+    profileRef.data = { grade: '11' }
+    vocabRef.data = [VOCAB]
+    render(<SessionReport />)
+    await waitFor(() => expect(screen.getByTestId('vocab-word-world')).toBeInTheDocument())
+  })
+
+  it('highlights for grade 12 and MBA students too', async () => {
+    profileRef.data = { grade: 'MBA' }
+    vocabRef.data = [VOCAB]
+    render(<SessionReport />)
+    await waitFor(() => expect(screen.getByTestId('vocab-word-world')).toBeInTheDocument())
+  })
+
+  it('tapping a vocab word opens the definition sheet', async () => {
+    const user = (await import('@testing-library/user-event')).default.setup()
+    profileRef.data = { grade: '12' }
+    vocabRef.data = [VOCAB]
+    render(<SessionReport />)
+    await waitFor(() => screen.getByTestId('vocab-word-world'))
+    await user.click(screen.getByTestId('vocab-word-world'))
+    expect(screen.getByText(VOCAB.definition)).toBeInTheDocument()
+    // Example sentence is wrapped in quotes for styling; match the inner text
+    expect(screen.getByText(new RegExp(VOCAB.example_sentence.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))).toBeInTheDocument()
+  })
+
+  it('sheet shows part-of-speech and the word', async () => {
+    const user = (await import('@testing-library/user-event')).default.setup()
+    profileRef.data = { grade: '11' }
+    vocabRef.data = [VOCAB]
+    render(<SessionReport />)
+    await waitFor(() => screen.getByTestId('vocab-word-world'))
+    await user.click(screen.getByTestId('vocab-word-world'))
+    expect(screen.getByRole('heading', { name: 'World' })).toBeInTheDocument()
+    expect(screen.getByText(/noun/i)).toBeInTheDocument()
+  })
+
+  it('sheet closes on close button click', async () => {
+    const user = (await import('@testing-library/user-event')).default.setup()
+    profileRef.data = { grade: '11' }
+    vocabRef.data = [VOCAB]
+    render(<SessionReport />)
+    await waitFor(() => screen.getByTestId('vocab-word-world'))
+    await user.click(screen.getByTestId('vocab-word-world'))
+    expect(screen.getByText(VOCAB.definition)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /close/i }))
+    expect(screen.queryByText(VOCAB.definition)).not.toBeInTheDocument()
+  })
+
+  it('non-vocab words have no vocab testid', async () => {
+    profileRef.data = { grade: '11' }
+    vocabRef.data = [VOCAB] // only "world"; "Hello" is not vocab
+    render(<SessionReport />)
+    await waitFor(() => screen.getByText('Hello'))
+    expect(screen.queryByTestId('vocab-word-hello')).not.toBeInTheDocument()
   })
 })

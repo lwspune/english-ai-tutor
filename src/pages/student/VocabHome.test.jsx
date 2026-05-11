@@ -168,3 +168,34 @@ describe('VocabHome — practice button', () => {
     expect(btn).not.toBeDisabled()
   })
 })
+
+describe('VocabHome — reading encounters', () => {
+  it('hides the reading encounters line when none', async () => {
+    mockProgress.value = []
+    render(<VocabHome />)
+    await screen.findByRole('button', { name: /start practice/i })
+    expect(screen.queryByTestId('seen-from-reading')).not.toBeInTheDocument()
+  })
+
+  it('shows reading-encounter count when > 0', async () => {
+    mockProgress.value = [
+      { mastered_at: null, next_review_at: '2026-06-01T00:00:00Z', last_encounter_source: 'reading' },
+      { mastered_at: null, next_review_at: '2026-06-01T00:00:00Z', last_encounter_source: 'reading' },
+      { mastered_at: null, next_review_at: '2026-06-01T00:00:00Z', last_encounter_source: 'practice' },
+    ]
+    render(<VocabHome />)
+    const el = await screen.findByTestId('seen-from-reading')
+    expect(el).toHaveTextContent('2')
+    expect(el).toHaveTextContent(/reading sessions/i)
+  })
+
+  it('counts only rows where last_encounter_source equals "reading"', async () => {
+    mockProgress.value = [
+      { mastered_at: null, next_review_at: '2026-06-01T00:00:00Z', last_encounter_source: 'practice' },
+      { mastered_at: null, next_review_at: '2026-06-01T00:00:00Z', last_encounter_source: null },
+    ]
+    render(<VocabHome />)
+    await screen.findByRole('button', { name: /start practice/i })
+    expect(screen.queryByTestId('seen-from-reading')).not.toBeInTheDocument()
+  })
+})

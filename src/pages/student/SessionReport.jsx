@@ -3,6 +3,44 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { WPM_TARGETS } from '../../lib/wpmTargets'
 
+const VOCAB_GRADES = new Set(['11', '12', 'MBA'])
+const normalizeWord = (s) => s.toLowerCase().replace(/^[^a-z-]+|[^a-z-]+$/g, '')
+
+function VocabSheet({ vocab, onClose }) {
+  if (!vocab) return null
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40"
+      onClick={onClose}
+      role="dialog"
+      aria-label={`Definition of ${vocab.word}`}
+    >
+      <div
+        className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md p-5 space-y-3 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-baseline justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="text-xl font-bold text-slate-800">{vocab.word}</h3>
+            <p className="text-xs uppercase tracking-wide text-slate-400 mt-0.5">{vocab.part_of_speech}</p>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="text-slate-400 hover:text-slate-700 text-2xl leading-none min-h-[44px] min-w-[44px] flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 rounded"
+          >
+            ×
+          </button>
+        </div>
+        <p className="text-sm text-slate-700">{vocab.definition}</p>
+        {vocab.example_sentence && (
+          <p className="text-sm text-slate-500 italic">"{vocab.example_sentence}"</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function ComprehensionResults({ questions, answers }) {
   return (
     <div className="bg-white rounded-2xl shadow-sm p-5 space-y-4">
@@ -102,6 +140,8 @@ export default function SessionReport() {
   const [grade, setGrade] = useState(null)
   const [questions, setQuestions] = useState([])
   const [personalBest, setPersonalBest] = useState(null)
+  const [vocabMap, setVocabMap] = useState(null) // Map<lowercase word, vocab>
+  const [openVocab, setOpenVocab] = useState(null)
 
   useEffect(() => {
     async function load() {
@@ -133,6 +173,15 @@ export default function SessionReport() {
           prevBestAccuracy,
           prevBestWpm,
         })
+      }
+
+      if (VOCAB_GRADES.has(String(p?.grade))) {
+        const { data: vocab } = await supabase
+          .from('vocabulary_words')
+          .select('word, part_of_speech, definition, example_sentence')
+        const map = new Map()
+        for (const v of vocab ?? []) map.set(v.word.toLowerCase(), v)
+        setVocabMap(map)
       }
     }
     load()
@@ -243,24 +292,39 @@ export default function SessionReport() {
               const title = result.status === 'substitution' && result.spoken
                 ? `Said: "${result.spoken}"`
                 : undefined
+              const normalised = normalizeWord(result.word)
+              const vocab = vocabMap?.get(normalised)
+              const vocabClass = vocab
+                ? ' underline decoration-dotted decoration-indigo-500 underline-offset-4 cursor-pointer'
+                : ''
               return (
                 <span
                   key={i}
                   title={title}
-                  className={`px-2 py-0.5 rounded text-sm font-medium ${colorClass}`}
+                  data-testid={vocab ? `vocab-word-${normalised}` : undefined}
+                  role={vocab ? 'button' : undefined}
+                  tabIndex={vocab ? 0 : undefined}
+                  onClick={vocab ? () => setOpenVocab(vocab) : undefined}
+                  onKeyDown={vocab ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpenVocab(vocab) } } : undefined}
+                  className={`px-2 py-0.5 rounded text-sm font-medium ${colorClass}${vocabClass}`}
                 >
                   {result.word}
                 </span>
               )
             })}
           </div>
-          <div className="flex gap-4 mt-4 text-xs text-slate-500">
+          <div className="flex gap-4 mt-4 text-xs text-slate-500 flex-wrap">
             <span><span className="inline-block w-3 h-3 rounded bg-green-200 mr-1" />Correct</span>
             <span><span className="inline-block w-3 h-3 rounded bg-amber-200 mr-1" />Substituted</span>
             <span><span className="inline-block w-3 h-3 rounded bg-red-200 mr-1" />Skipped</span>
+            {vocabMap && vocabMap.size > 0 && (
+              <span className="underline decoration-dotted decoration-indigo-500 underline-offset-4">Vocab — tap for definition</span>
+            )}
           </div>
         </div>
       </main>
+
+      <VocabSheet vocab={openVocab} onClose={() => setOpenVocab(null)} />
     </div>
   )
 }

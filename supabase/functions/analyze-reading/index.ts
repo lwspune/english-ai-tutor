@@ -367,6 +367,25 @@ Deno.serve(async (req) => {
       console.log(`Spike: retained audio (slot ${spikeSlot}) for session ${session.id}`)
     }
 
+    // v2.1: bump total_encounters for any vocab words present in the passage.
+    // Best-effort; failures here must not break the session response.
+    try {
+      const normalizedPassageWords = [...new Set(
+        passageWords
+          .map(w => w.toLowerCase().replace(/^[^a-z-]+|[^a-z-]+$/g, ''))
+          .filter(Boolean),
+      )]
+      if (normalizedPassageWords.length > 0) {
+        const { error: vocabErr } = await supabase.rpc('record_vocab_reading_encounters', {
+          p_student_id: studentId,
+          p_words: normalizedPassageWords,
+        })
+        if (vocabErr) console.error('Vocab encounter tracking failed (non-fatal):', vocabErr)
+      }
+    } catch (err) {
+      console.error('Vocab encounter tracking errored (non-fatal):', err)
+    }
+
     return new Response(JSON.stringify({ sessionId: session.id }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

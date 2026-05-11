@@ -16,6 +16,7 @@ export default function VocabHome() {
   const [mastered, setMastered] = useState(0)
   const [due, setDue] = useState(0)
   const [seen, setSeen] = useState(0)
+  const [seenFromReading, setSeenFromReading] = useState(0)
 
   useEffect(() => {
     if (!allowed) return
@@ -25,7 +26,7 @@ export default function VocabHome() {
         .select('*', { count: 'exact', head: true })
       const { data: progress } = await supabase
         .from('student_word_progress')
-        .select('mastered_at, next_review_at')
+        .select('mastered_at, next_review_at, last_encounter_source')
         .eq('student_id', profile.id)
 
       const now = Date.now()
@@ -34,6 +35,7 @@ export default function VocabHome() {
       setMastered(rows.filter(r => r.mastered_at).length)
       setDue(rows.filter(r => !r.mastered_at && new Date(r.next_review_at).getTime() <= now).length)
       setSeen(rows.length)
+      setSeenFromReading(rows.filter(r => r.last_encounter_source === 'reading').length)
       setLoading(false)
     }
     load()
@@ -86,6 +88,12 @@ export default function VocabHome() {
                   aria-label={`${mastered} of ${total} mastered`}
                 />
               </div>
+              {seenFromReading > 0 && (
+                <p data-testid="seen-from-reading" className="text-xs text-slate-500 mt-3">
+                  <span className="font-semibold text-slate-700">{seenFromReading}</span>{' '}
+                  {seenFromReading === 1 ? 'word' : 'words'} encountered through your reading sessions.
+                </p>
+              )}
             </div>
 
             <div className="bg-indigo-50 rounded-2xl border border-indigo-200 px-5 py-5">

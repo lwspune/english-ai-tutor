@@ -1,0 +1,192 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import VocabPractice from './VocabPractice'
+
+const mockNavigate = vi.fn()
+vi.mock('react-router-dom', () => ({
+  useNavigate: () => mockNavigate,
+}))
+
+vi.mock('../../components/BottomNav', () => ({
+  default: () => <div data-testid="bottom-nav" />,
+}))
+
+const { mockProfile, mockWords, mockProgress, mockRpc } = vi.hoisted(() => ({
+  mockProfile: { value: { id: 's1', grade: '11' } },
+  mockWords: { value: [] },
+  mockProgress: { value: [] },
+  mockRpc: vi.fn(() => Promise.resolve({ data: {}, error: null })),
+}))
+
+vi.mock('../../lib/AuthContext', () => ({
+  useAuth: () => ({ profile: mockProfile.value }),
+}))
+
+vi.mock('../../lib/supabase', () => ({
+  supabase: {
+    from: (table) => {
+      if (table === 'vocabulary_words') {
+        return {
+          select: () => Promise.resolve({ data: mockWords.value, error: null }),
+        }
+      }
+      if (table === 'student_word_progress') {
+        return {
+          select: () => ({
+            eq: () => Promise.resolve({ data: mockProgress.value, error: null }),
+          }),
+        }
+      }
+      return {}
+    },
+    rpc: (...args) => mockRpc(...args),
+  },
+}))
+
+// Fix Math.random for predictable card option order in tests
+const realRandom = Math.random
+beforeEach(() => {
+  Math.random = () => 0.5
+  mockProfile.value = { id: 's1', grade: '11' }
+  mockWords.value = [
+    {
+      id: 'w1',
+      word: 'Abandon',
+      part_of_speech: 'verb',
+      definition: 'To give up completely.',
+      example_sentence: 'They had to abandon the building.',
+      synonyms: ['forsake', 'desert', 'leave'],
+      antonyms: ['keep', 'retain'],
+      created_at: '2026-04-01T00:00:00Z',
+    },
+    {
+      id: 'w2',
+      word: 'Brisk',
+      part_of_speech: 'adjective',
+      definition: 'Quick and energetic.',
+      example_sentence: 'A brisk walk.',
+      synonyms: ['quick', 'lively'],
+      antonyms: ['sluggish', 'slow'],
+      created_at: '2026-04-02T00:00:00Z',
+    },
+    {
+      id: 'w3',
+      word: 'Candid',
+      part_of_speech: 'adjective',
+      definition: 'Truthful and frank.',
+      example_sentence: 'A candid review.',
+      synonyms: ['frank', 'honest'],
+      antonyms: ['evasive', 'guarded'],
+      created_at: '2026-04-03T00:00:00Z',
+    },
+  ]
+  mockProgress.value = []
+  mockRpc.mockClear()
+  mockRpc.mockResolvedValue({ data: {}, error: null })
+  mockNavigate.mockReset()
+})
+
+afterEach(() => {
+  Math.random = realRandom
+})
+
+describe('VocabPractice', () => {
+  it('shows loading state initially', async () => {
+    render(<VocabPractice />)
+    expect(screen.getByText(/loading/i)).toBeInTheDocument()
+  })
+
+  it('shows empty state when no cards available', async () => {
+    mockWords.value = []
+    render(<VocabPractice />)
+    await waitFor(() => {
+      expect(screen.getByText(/all caught up/i)).toBeInTheDocument()
+    })
+  })
+
+  it('renders the target word and prompt for first card', async () => {
+    render(<VocabPractice />)
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Abandon' })).toBeInTheDocument()
+      expect(screen.getByText(/closest in meaning to "Abandon"/i)).toBeInTheDocument()
+    })
+  })
+
+  it('renders 4 option buttons', async () => {
+    render(<VocabPractice />)
+    await waitFor(() => {
+      const options = screen.getAllByTestId(/^option-/)
+      expect(options).toHaveLength(4)
+    })
+  })
+
+  it('shows definition and example sentence', async () => {
+    render(<VocabPractice />)
+    await waitFor(() => {
+      expect(screen.getByText(/give up completely/i)).toBeInTheDocument()
+      expect(screen.getByText(/abandon the building/i)).toBeInTheDocument()
+    })
+  })
+
+  it('tapping the correct option calls grade_vocab_attempt with was_correct=true', async () => {
+    const user = userEvent.setup()
+    render(<VocabPractice />)
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Abandon' })).toBeInTheDocument())
+    const correctButton = screen.getByRole('button', { name: /^forsake$/i })
+    await user.click(correctButton)
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledWith('grade_vocab_attempt', { p_word_id: 'w1', p_was_correct: true })
+    })
+  })
+
+  it('tapping a wrong option calls grade_vocab_attempt with was_correct=false', async () => {
+    const user = userEvent.setup()
+    render(<VocabPractice />)
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Abandon' })).toBeInTheDocument())
+    // Find a wrong option (any option whose label isn't a synonym of Abandon)
+    const options = screen.getAllByTestId(/^option-/)
+    const wrongOption = [...options].find(b => !['forsake', 'desert', 'leave'].includes(b.textContent.toLowerCase()))
+    await user.click(wrongOption)
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledWith('grade_vocab_attempt', { p_word_id: 'w1', p_was_correct: false })
+    })
+  })
+
+  it('shows a Next button after answering', async () => {
+    const user = userEvent.setup()
+    render(<VocabPractice />)
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Abandon' })).toBeInTheDocument())
+    await user.click(screen.getAllByTestId(/^option-/)[0])
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /next/i })).toBeInTheDocument()
+    })
+  })
+
+  it('advances to the next card on Next', async () => {
+    const user = userEvent.setup()
+    render(<VocabPractice />)
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Abandon' })).toBeInTheDocument())
+    await user.click(screen.getAllByTestId(/^option-/)[0])
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Brisk' })).toBeInTheDocument()
+    })
+  })
+
+  it('shows session summary after the last card', async () => {
+    const user = userEvent.setup()
+    mockWords.value = mockWords.value.slice(0, 1) // one card only
+    render(<VocabPractice />)
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Abandon' })).toBeInTheDocument())
+    const correctBtn = screen.getByRole('button', { name: /^forsake$/i })
+    await user.click(correctBtn)
+    await user.click(screen.getByRole('button', { name: /finish/i }))
+    await waitFor(() => {
+      expect(screen.getByText(/session complete/i)).toBeInTheDocument()
+      // "1 of 1" — text is broken across spans, so match the surrounding context
+      expect(screen.getByText(/^correct$/i)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /done/i })).toBeInTheDocument()
+    })
+  })
+})

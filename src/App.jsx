@@ -7,6 +7,8 @@ import ReadingSession from './pages/student/ReadingSession'
 import SessionReport from './pages/student/SessionReport'
 import ComprehensionQuiz from './pages/student/ComprehensionQuiz'
 import StudentProgress from './pages/student/StudentProgress'
+import VocabHome from './pages/student/VocabHome'
+import VocabPractice from './pages/student/VocabPractice'
 import TeacherDashboard from './pages/teacher/TeacherDashboard'
 import PassageManager from './pages/teacher/PassageManager'
 import StudentDetail from './pages/teacher/StudentDetail'
@@ -35,6 +37,8 @@ export default function App() {
           <Route path="/student/report/:sessionId" element={<ProtectedRoute role="student"><SessionReport /></ProtectedRoute>} />
           <Route path="/student/comprehension/:sessionId" element={<ProtectedRoute role="student"><ComprehensionQuiz /></ProtectedRoute>} />
           <Route path="/student/progress" element={<ProtectedRoute role="student"><StudentProgress /></ProtectedRoute>} />
+          <Route path="/student/vocab" element={<ProtectedRoute role="student"><VocabHome /></ProtectedRoute>} />
+          <Route path="/student/vocab/practice" element={<ProtectedRoute role="student"><VocabPractice /></ProtectedRoute>} />
 
           <Route path="/teacher" element={<ProtectedRoute role="teacher"><TeacherDashboard /></ProtectedRoute>} />
           <Route path="/teacher/passages" element={<ProtectedRoute role="teacher"><PassageManager /></ProtectedRoute>} />

@@ -183,4 +183,12 @@ describe('TeacherDashboard — summary stat chips', () => {
     expect(chip).toHaveTextContent('85%')
     expect(chip).toHaveTextContent(/avg accuracy/i)
   })
+
+  it('shows vocab mastery chip ("—" when no grade 11+ students)', async () => {
+    render(<TeacherDashboard />)
+    await waitFor(() => screen.getByText('Aarav Shah'))
+    const chip = screen.getByTestId('stat-vocab')
+    expect(chip).toHaveTextContent('—')
+    expect(chip).toHaveTextContent(/vocab mastery/i)
+  })
 })

@@ -32,3 +32,13 @@ supabase/.temp/
 # Local Claude Code config (contains tokens)
 .mcp.json
 .claude/
+
+# Phase 1 spike — retained audio + local Python env (do not commit)
+spike-audio/
+scripts/spike/.venv/
+scripts/spike/__pycache__/
+
+# Vocab seed scaffolding — intermediates; entries.json is the source of truth
+scripts/vocab/batch_*.json
+scripts/vocab/seed_chunk_*.sql
+scripts/vocab/__pycache__/

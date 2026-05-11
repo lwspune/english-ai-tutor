@@ -18,6 +18,7 @@ export default function TeacherDashboard() {
   const [updatingLimit, setUpdatingLimit] = useState(false)
   const [showAddStudent, setShowAddStudent] = useState(false)
   const [studentFetchTrigger, setStudentFetchTrigger] = useState(0)
+  const [classVocabMastery, setClassVocabMastery] = useState(null)
 
   function copyCode() {
     navigator.clipboard.writeText(classCode)
@@ -102,6 +103,30 @@ export default function TeacherDashboard() {
     }
     loadStudents()
   }, [studentFetchTrigger])
+
+  useEffect(() => {
+    async function loadVocabStats() {
+      const eligibleIds = students.filter(s => ['11', '12', 'MBA'].includes(String(s.grade))).map(s => s.id)
+      if (!eligibleIds.length) {
+        setClassVocabMastery(null)
+        return
+      }
+      const { count: totalWords } = await supabase
+        .from('vocabulary_words')
+        .select('*', { count: 'exact', head: true })
+      const { data: progressRows } = await supabase
+        .from('student_word_progress')
+        .select('student_id, mastered_at')
+        .in('student_id', eligibleIds)
+      const masteredCount = (progressRows ?? []).filter(r => r.mastered_at).length
+      if (!totalWords) {
+        setClassVocabMastery(null)
+        return
+      }
+      setClassVocabMastery(Math.round(100 * masteredCount / (eligibleIds.length * totalWords)))
+    }
+    if (students.length > 0) loadVocabStats()
+  }, [students])
 
   function handleModalClose(didAdd) {
     setShowAddStudent(false)
@@ -196,7 +221,7 @@ export default function TeacherDashboard() {
           return (
             <>
               {/* Summary stat chips */}
-              <div className="grid grid-cols-3 gap-3 mb-5">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
                 <div data-testid="stat-students" className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
                   <p className="text-2xl font-bold text-slate-800">{students.length}</p>
                   <p className="text-xs text-slate-500 mt-1">Students</p>
@@ -210,6 +235,12 @@ export default function TeacherDashboard() {
                     {classAvgAccuracy !== null ? `${classAvgAccuracy}%` : '—'}
                   </p>
                   <p className="text-xs text-slate-500 mt-1">Avg Accuracy</p>
+                </div>
+                <div data-testid="stat-vocab" className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
+                  <p className="text-2xl font-bold text-slate-800">
+                    {classVocabMastery !== null ? `${classVocabMastery}%` : '—'}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-1">Vocab Mastery</p>
                 </div>
               </div>
 

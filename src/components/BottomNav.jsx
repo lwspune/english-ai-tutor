@@ -1,4 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
+import { useAuth } from '../lib/AuthContext'
+
+const VOCAB_GRADES = new Set(['11', '12', 'MBA'])
 
 function HomeIcon() {
   return (
@@ -13,6 +16,15 @@ function ChartIcon() {
   return (
     <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+    </svg>
+  )
+}
+
+function BookIcon() {
+  return (
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
     </svg>
   )
 }
@@ -35,12 +47,22 @@ function NavItem({ to, label, icon, active }) {
 
 export default function BottomNav() {
   const { pathname } = useLocation()
+  const { profile } = useAuth()
+  const showVocab = profile && VOCAB_GRADES.has(String(profile.grade))
   return (
     <nav
       className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex z-40"
       aria-label="Main navigation"
     >
       <NavItem to="/student" label="Home" icon={<HomeIcon />} active={pathname === '/student'} />
+      {showVocab && (
+        <NavItem
+          to="/student/vocab"
+          label="Vocab"
+          icon={<BookIcon />}
+          active={pathname.startsWith('/student/vocab')}
+        />
+      )}
       <NavItem to="/student/progress" label="Progress" icon={<ChartIcon />} active={pathname === '/student/progress'} />
     </nav>
   )

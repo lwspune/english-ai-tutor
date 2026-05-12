@@ -2,15 +2,19 @@
 
 Captured 2026-05-12 after a critical review of a 15-item product wishlist. This file holds the picks worth building, in build order, plus the rationale for what was deliberately skipped. Treat as a planning artifact, not a contract — revisit when a foundation assumption changes.
 
+**Hypothesis convention (added 2026-05-12).** Each active item carries a `**What we'll learn:**` line — the testable claim the build is meant to validate, plus the signal we'd watch to know it's true or false. When an item ships, the hypothesis becomes a `DECISIONS.md` entry with a watch + revisit trigger. If you find yourself unable to write a hypothesis for an item, that item isn't ready for build order yet.
+
 ## Build order
 
-Each item below has: *why it's worth doing*, *when to do it*, and the *concrete first step*. Sequencing matters — the dependencies are real.
+Each item below has: *why it's worth doing*, *when to do it*, the *concrete first step*, and *what we'll learn*. Sequencing matters — the dependencies are real.
 
 ### 1. Self-reflection prompts — ship next
 
 Adds a metacognition signal the app currently lacks. Cheap (~half a day), independent of every other initiative, and unlocks a downstream metric ("self-perception calibration") that no other feature produces.
 
 **First step:** migration adds `sessions.self_perception text` (values `easier | same | harder | null`). After every `SessionReport`, a 3-button question: *"Did this feel easier / same / harder than last time?"* Store. Skippable. Later: compare against actual accuracy delta to surface students who consistently mis-rate themselves — real teacher insight.
+
+**What we'll learn:** whether self-perception spreads predictably against measured accuracy delta, or whether students systematically mis-calibrate. If most rate accurately within their own band, the metric is redundant with accuracy itself and we kill the feature. If 20%+ of ratings are clearly mis-calibrated (rated "easier" but accuracy dropped, or vice versa), that's an actionable teacher signal we can't get any other way.
 
 Maps loosely to suggestion #12 from the original list.
 
@@ -21,6 +25,8 @@ Roughly 70% of the infrastructure already exists (v2.1 highlights, retention qui
 **First step (two parts, in order):**
 - **Pre-reading vocab preview card** on `ReadingSession`: a 5-second tap-through showing the 2-3 vocab words that appear in the passage, with definition + audio. Adds zero friction (skippable). Solves "students hit vocab words cold."
 - **Post-reading wrong-word SRS push:** vocab words appearing in `word_results` with `status ≠ 'correct'` get pushed down a Leitner box in `student_word_progress` via the existing `grade_vocab_attempt` (or a new sibling RPC). Reading mistakes feed practice automatically.
+
+**What we'll learn:** whether `last_encounter_source = 'reading'` rows start populating once content actually contains vocab words (currently 0; root cause is content-overlap, not the trigger). If still 0 after the preview ships, the content problem dominates and we re-content the recent passages. If reading-source rows climb and SRS box drops correlate with subsequent in-session improvement, the loop closes.
 
 Maps to suggestion #11.
 
@@ -45,13 +51,17 @@ updated_at timestamptz
 
 Once this exists, items 4 below — plus a smarter hero "Next Up", dynamic per-student goal text, and adaptive difficulty gating — are each 1–2 day extensions rather than multi-week features.
 
+**What we'll learn:** whether students cluster into 2–4 distinct profiles (high-consistent, climbing, flat, struggling) when aggregated against these signals. If clusters emerge, adaptive logic has traction and items 4+ have a foundation. If signals don't cluster (most students look noisy and similar), the personalisation thesis is wrong and the foundation we'd build on adaptive logic is unstable — revert to teacher-driven judgement.
+
 Maps to suggestion #1; absorbs the actionable parts of #2, #6, #14.
 
 ### 4. Weakness-specific deliberate-practice drills — BLOCKED on #3
 
 The highest *learning* leverage on the original list. Operationalises the "Deliberate Practice" principle from CLAUDE.md that's currently aspirational. Replaces generic "keep practising" advice with specific, evidence-driven micro-interventions.
 
-**First step (post-#3):** a 60-second drill component injected after a session whose accuracy is below the student's rolling average. Drill content pulled from `student_signals.recurring_omission_words` (or `recurring_substitution_words` if those dominate). UI: 2–3 of the troublesome words shown in single-sentence contexts, read aloud, scored on the spot.
+**First step (post-#3):** a 60-second drill component injected after a session whose accuracy is below the student's rolling average. Drill content pulled from `student_signals.recurring_omission_words` (or `recurring_substitution_words` if those dominate). UI: 2–3 of the troublesome words shown in single-sentence contexts, read aloud, scored on the spot. (Note: the v1c drill shipped 2026-05-12 is the surface; this item is the *signals-driven* version that replaces the simple top-3 picker.)
+
+**What we'll learn:** whether drilling on a word measurably shifts that word out of `recurring_substitution_words` / `recurring_omission_words` within 14 days. If yes, deliberate practice produces durable change and the loop is real. If no, drilling is exposure without retention — kill the mechanic or fundamentally rethink it. (v1c on a simple top-3 picker is the cheap baseline against which the signals-driven version proves its worth.)
 
 Maps to suggestion #3.
 
@@ -77,6 +87,8 @@ Student-side "Report this question" / "Report this pronunciation" buttons on `Se
 
 **First step:** read `memory/project_planned_content_reports.md`. The open decisions there (storage shape, teacher-review surface, notification cadence) determine the scope.
 
+**What we'll learn:** the distribution of report types and the long-tail vs. short-tail shape. Hypothesis: a handful of items get multiple reports (real fixes) plus a long tail of one-offs. If reports are zero after 30 days, students either don't trust the channel or have nothing to report — both useful signals about content quality vs. UX trust.
+
 ### B. Per-session 👍/👎 rating — ~1 day
 
 A thumbs-up/down control on `SessionReport`, optional one-line text comment. Stored as `sessions.student_rating smallint` (-1 / 0 / 1) + `sessions.student_comment text` (nullable, ~140 char cap). No 5-star, no long-form input.
@@ -84,6 +96,8 @@ A thumbs-up/down control on `SessionReport`, optional one-line text comment. Sto
 **Why it's worth the day — conditional:** *only if* someone will read the reports weekly. Silent feedback rots faster than no feedback. Useful for "is this passage too hard?" / "is the AI feedback useful?" Decide the consumer (probably a "Recent feedback" row on the teacher dashboard) before building.
 
 **First step:** decide and document the consumer. Without that, do not ship.
+
+**What we'll learn:** whether session ratings correlate with measurable signals (accuracy, return-rate, comprehension score) or pick up something objective metrics miss. If ratings are highly correlated with accuracy, the channel is redundant — the data already shows what students would say. If they diverge (e.g., students rate 👎 on sessions where they scored well), there's a subjective layer the metrics miss and the feedback is earning its keep.
 
 ### C. Streak-at-risk Monday email — ~2 hours
 
@@ -93,6 +107,8 @@ Extend `send-reminders` cron. Once on Monday morning IST, email any student whos
 
 **First step:** add a `streak_at_risk` category to `buildReminderList` in `src/lib/reminders.js`. Existing 3-day cooldown still applies. Test path: student with streak ≥1, no session Fri–Sun, Monday-AM cron run → email generated.
 
+**What we'll learn:** whether Monday read-rate among streak-at-risk students lifts vs. the prior 4-week baseline. >10% absolute lift is a clear win. If lift is flat or negative, the reminder either isn't being opened or feels like nagging — pull it.
+
 ### D. Adaptive reminder timing — ~half day, gated on data
 
 Track each student's modal reading hour (IST-localised from `sessions.created_at`). Shift their `send-reminders` send time to ~10 minutes before that hour, replacing the current global 04:30 UTC slot.
@@ -100,6 +116,8 @@ Track each student's modal reading hour (IST-localised from `sessions.created_at
 **Why:** opening a reminder 10 minutes before you'd naturally read is dramatically more effective than one that arrives at random. Real cohort data should show clear per-student modes; if it doesn't yet, this feature is premature — students don't have entrenched habits yet.
 
 **First step:** SQL — for each student with ≥10 sessions, compute `mode(extract(hour from created_at AT TIME ZONE 'Asia/Kolkata'))`. If at least 10 students show a clear mode (frequency >40% of their sessions in one hour-bucket), build it. Otherwise, park for 3 months and re-check.
+
+**What we'll learn:** whether reading-hour habits are even stable at this scale. If most students don't show modes, students don't yet have habits the timing can hook into and this feature is premature. The SQL itself is the experiment — no build needed to invalidate.
 
 ### E. Polish sprints — A then B then C
 
@@ -110,6 +128,11 @@ Track each student's modal reading hour (IST-localised from `sessions.created_at
 - **E.C. Landing/marketing page** — `/` for unauthenticated visitors becomes a real page (currently just redirects to login). Parents browsing the URL should see the value prop. Copy + 2-3 illustrations + sign-in CTA.
 
 **Why this framing:** the engagement polish layer (sound, haptics, confetti, animations) shipped 2026-05-11 lifted the *moment-to-moment* feel. These three lift the *first-impression* and *unfamiliar-state* feel — where students drop off most.
+
+**What we'll learn (per sprint):**
+- E.A — whether students bounce less from empty / loading states. Compare bounce-from-empty rate (sessions where the student lands on a blank page and leaves within 10s) before/after.
+- E.B — first-time-student → second-session conversion. Currently unknown; baseline once the onboarding ships.
+- E.C — anonymous-to-signup conversion on the landing page (requires basic analytics; small lift acceptable since the parent-trust function alone justifies it).
 
 ## Deliberately skipped
 

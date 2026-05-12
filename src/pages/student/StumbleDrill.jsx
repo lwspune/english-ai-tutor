@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAudioRecorder } from '../../hooks/useAudioRecorder'
 import { useAuth } from '../../lib/AuthContext'
-import AudioPlayButton from '../../components/AudioPlayButton'
+import SpeakWordButton from '../../components/SpeakWordButton'
 import { feedback } from '../../lib/feedback'
 import { selectStumbleWords } from '../../lib/stumbleWords'
 import { findSentence } from '../../lib/stumbleSentence'
@@ -137,7 +137,7 @@ export default function StumbleDrill() {
         <div className="bg-white rounded-2xl shadow-sm p-6 text-center">
           <div className="flex items-center justify-center gap-2 mb-2">
             <h2 className="text-3xl font-bold text-indigo-700">{stumble.word}</h2>
-            <AudioPlayButton word={stumble.word} />
+            <SpeakWordButton word={stumble.word} />
           </div>
           <p className="text-xs uppercase tracking-wide text-slate-400 mb-4">
             Read it aloud in this sentence

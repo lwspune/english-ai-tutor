@@ -64,8 +64,8 @@ vi.mock('../../hooks/useAudioRecorder', () => ({
   useAudioRecorder: () => recorderState.value,
 }))
 
-vi.mock('../../components/AudioPlayButton', () => ({
-  default: ({ word }) => <button aria-label={`Play ${word}`}>▶</button>,
+vi.mock('../../components/SpeakWordButton', () => ({
+  default: ({ word }) => <button aria-label={`Play pronunciation of ${word}`}>▶</button>,
 }))
 
 vi.mock('../../components/Confetti', () => ({

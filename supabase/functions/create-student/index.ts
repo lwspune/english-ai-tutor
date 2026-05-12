@@ -7,6 +7,7 @@ const corsHeaders = {
 
 const VALID_GRADES = new Set(['9', '10', '11', '12', 'MBA'])
 const SITE_URL = 'https://english-ai-tutor-mauve.vercel.app'
+const RESET_URL = `${SITE_URL}/reset-password`
 const FROM_EMAIL = 'tutor@lwspune.in'
 
 function isValidEmail(email: string): boolean {
@@ -22,7 +23,7 @@ function validateStudent(s: { full_name?: string; email?: string; password?: str
   return errors
 }
 
-async function sendWelcomeEmail(name: string, email: string, password: string, apiKey: string): Promise<void> {
+async function sendWelcomeEmail(name: string, email: string, activationLink: string, apiKey: string): Promise<void> {
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -32,24 +33,15 @@ async function sendWelcomeEmail(name: string, email: string, password: string, a
     body: JSON.stringify({
       from: FROM_EMAIL,
       to: email,
-      subject: 'Welcome to English AI Tutor — Your Login Details',
+      subject: 'Welcome to English AI Tutor — Set Your Password',
       html: `
         <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
           <h2 style="color:#1e293b">Welcome, ${name}!</h2>
-          <p style="color:#475569">Your English AI Tutor account is ready. Here are your login details:</p>
-          <table style="border-collapse:collapse;width:100%;margin:16px 0;background:#f8fafc;border-radius:8px">
-            <tr>
-              <td style="padding:10px 14px;color:#64748b;width:90px">Email</td>
-              <td style="padding:10px 14px;font-weight:600;color:#1e293b">${email}</td>
-            </tr>
-            <tr style="background:#f1f5f9">
-              <td style="padding:10px 14px;color:#64748b">Password</td>
-              <td style="padding:10px 14px;font-weight:600;color:#1e293b">${password}</td>
-            </tr>
-          </table>
-          <a href="${SITE_URL}" style="display:inline-block;background:#4f46e5;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin:8px 0">
-            Start Practising →
+          <p style="color:#475569">Your English AI Tutor account is ready. Click the button below to set your password and sign in.</p>
+          <a href="${activationLink}" style="display:inline-block;background:#4f46e5;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin:16px 0">
+            Set your password →
           </a>
+          <p style="color:#94a3b8;font-size:12px;margin-top:8px">This link expires soon. If it does, your teacher can resend it, or use the "Forgot password?" option on the sign-in page.</p>
           <p style="color:#94a3b8;font-size:12px;margin-top:24px">English AI Tutor · LWS Pune</p>
         </div>
       `,
@@ -104,7 +96,7 @@ Deno.serve(async (req) => {
 
     const resendKey = Deno.env.get('RESEND_API_KEY')
     const results = []
-    const emailQueue: { name: string; email: string; password: string }[] = []
+    const emailQueue: { name: string; email: string }[] = []
 
     for (const s of students) {
       const errors = validateStudent(s)
@@ -129,17 +121,33 @@ Deno.serve(async (req) => {
         results.push({ email: s.email, success: false, error: 'createUser returned no user' })
       } else {
         results.push({ email: s.email, success: true, id: data.user.id })
-        emailQueue.push({ name: s.full_name.trim(), email: s.email, password: s.password })
+        emailQueue.push({ name: s.full_name.trim(), email: s.email })
       }
     }
 
+    // Generate a recovery link per successful create + send welcome email.
+    // Recovery link is the activation token; replaces the previous flow of
+    // emailing the teacher-set plaintext password (Finding 8 in the
+    // security review). The teacher-set password still works as a fallback
+    // if the student loses the email.
     if (resendKey && emailQueue.length > 0) {
       await Promise.allSettled(
-        emailQueue.map(({ name, email, password }) =>
-          sendWelcomeEmail(name, email, password, resendKey).catch(err => {
-            console.error('Welcome email failed for', email, err)
+        emailQueue.map(async ({ name, email }) => {
+          const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
+            type: 'recovery',
+            email,
+            options: { redirectTo: RESET_URL },
           })
-        )
+          if (linkError || !linkData?.properties?.action_link) {
+            console.error('Failed to generate recovery link for', email, linkError)
+            return
+          }
+          try {
+            await sendWelcomeEmail(name, email, linkData.properties.action_link, resendKey)
+          } catch (err) {
+            console.error('Welcome email failed for', email, err)
+          }
+        })
       )
     }
 

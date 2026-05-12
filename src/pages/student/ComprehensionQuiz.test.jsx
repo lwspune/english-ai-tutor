@@ -118,6 +118,33 @@ describe('ComprehensionQuiz', () => {
     expect(mockFeedback).toHaveBeenCalledWith('swoosh')
   })
 
+  it('does NOT navigate away when grade_comprehension RPC returns an error', async () => {
+    // RPC dispatch — return error for grade_comprehension specifically
+    mockRpc.mockReset()
+    mockRpc.mockImplementation((fn) => {
+      if (fn === 'get_questions_for_session') {
+        return Promise.resolve({ data: QUESTION_ROWS, error: null })
+      }
+      if (fn === 'grade_comprehension') {
+        return Promise.resolve({ data: null, error: { message: 'Duplicate question_id' } })
+      }
+      return Promise.resolve({ data: null, error: null })
+    })
+    render(<ComprehensionQuiz />)
+    await waitFor(() => screen.getByText('Who wrote Hamlet?'))
+    fireEvent.click(screen.getByLabelText('Shakespeare'))
+    fireEvent.click(screen.getByLabelText('1600'))
+    fireEvent.click(screen.getByRole('button', { name: /submit answers/i }))
+    await waitFor(() => screen.getByRole('dialog'))
+    fireEvent.click(screen.getByRole('button', { name: /^submit$/i }))
+
+    // Should NOT navigate to report
+    await new Promise(r => setTimeout(r, 50))
+    expect(mockNavigate).not.toHaveBeenCalledWith('/student/report/session-abc', { replace: true })
+    // Should surface error to the student
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument())
+  })
+
   it('navigates to report after successful submission', async () => {
     render(<ComprehensionQuiz />)
     await waitFor(() => screen.getByText('Who wrote Hamlet?'))

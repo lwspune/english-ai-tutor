@@ -12,6 +12,7 @@ export default function ComprehensionQuiz() {
   const [submitting, setSubmitting] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [pendingAnswers, setPendingAnswers] = useState(null)
+  const [submitError, setSubmitError] = useState('')
 
   useEffect(() => {
     async function load() {
@@ -52,11 +53,17 @@ export default function ComprehensionQuiz() {
   async function confirmSubmit() {
     setConfirming(false)
     setSubmitting(true)
+    setSubmitError('')
     feedback('swoosh')
-    await supabase.rpc('grade_comprehension', {
+    const { error } = await supabase.rpc('grade_comprehension', {
       p_session_id: sessionId,
       p_answers: pendingAnswers,
     })
+    if (error) {
+      setSubmitError("We couldn't save your answers. Please try again or ask your teacher.")
+      setSubmitting(false)
+      return
+    }
     navigate(`/student/report/${sessionId}`, { replace: true })
   }
 
@@ -92,6 +99,11 @@ export default function ComprehensionQuiz() {
         <p className="text-sm text-slate-500">
           Answer all {questions.length} questions, then tap Submit.
         </p>
+        {submitError && (
+          <div role="alert" className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+            {submitError}
+          </div>
+        )}
         {submitting ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />

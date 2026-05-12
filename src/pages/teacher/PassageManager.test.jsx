@@ -16,8 +16,9 @@ vi.mock('../../components/QuestionPanel', () => ({
   default: () => null,
 }))
 
-const { mockInsert } = vi.hoisted(() => ({
+const { mockInsert, insertResponse } = vi.hoisted(() => ({
   mockInsert: vi.fn(),
+  insertResponse: { current: { data: null, error: null } },
 }))
 
 vi.mock('../../lib/supabase', () => ({
@@ -28,7 +29,7 @@ vi.mock('../../lib/supabase', () => ({
           select: () => ({ order: () => Promise.resolve({ data: [] }) }),
           insert: (payload) => {
             mockInsert(payload)
-            return Promise.resolve({ data: null, error: null })
+            return Promise.resolve(insertResponse.current)
           },
           delete: () => ({ eq: () => Promise.resolve({}) }),
         }
@@ -42,6 +43,7 @@ describe('PassageManager — difficulty', () => {
   beforeEach(() => {
     mockInsert.mockClear()
     mockNavigate.mockReset()
+    insertResponse.current = { data: null, error: null }
   })
 
   it('includes difficulty in the insert payload when saving a new passage', async () => {
@@ -77,6 +79,7 @@ describe('PassageManager — MBA grade level', () => {
   beforeEach(() => {
     mockInsert.mockClear()
     mockNavigate.mockReset()
+    insertResponse.current = { data: null, error: null }
   })
 
   it('shows MBA as a grade level option', async () => {
@@ -106,5 +109,27 @@ describe('PassageManager — MBA grade level', () => {
     expect(mockInsert).toHaveBeenCalledWith(
       expect.objectContaining({ grade_level: 'MBA' })
     )
+  })
+})
+
+describe('PassageManager — error surfacing (Finding 12)', () => {
+  beforeEach(() => {
+    mockInsert.mockClear()
+    mockNavigate.mockReset()
+    insertResponse.current = { data: null, error: null }
+  })
+
+  it('shows an error banner and keeps the form open when insert fails', async () => {
+    const user = userEvent.setup()
+    insertResponse.current = { data: null, error: { message: 'duplicate title' } }
+    render(<PassageManager />)
+    await user.click(screen.getByRole('button', { name: /\+ add passage/i }))
+    await user.type(screen.getByPlaceholderText(/the gift of the magi/i), 'Test')
+    await user.type(screen.getByPlaceholderText(/paste passage text/i), 'Some content.')
+    await user.click(screen.getByRole('button', { name: /save passage/i }))
+
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument())
+    // Form should remain open since the save failed
+    expect(screen.getByRole('button', { name: /save passage/i })).toBeInTheDocument()
   })
 })

@@ -107,6 +107,19 @@ afterEach(() => {
 })
 
 describe('VocabPractice', () => {
+  it('redirects grade-9/10 students back to /student/vocab (not gated by UI alone)', async () => {
+    mockProfile.value = { id: 's1', grade: '10' }
+    render(<VocabPractice />)
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/student/vocab', { replace: true }))
+  })
+
+  it('does NOT redirect grade-11 students', async () => {
+    mockProfile.value = { id: 's1', grade: '11' }
+    render(<VocabPractice />)
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Abandon' })).toBeInTheDocument())
+    expect(mockNavigate).not.toHaveBeenCalledWith('/student/vocab', { replace: true })
+  })
+
   it('shows loading state initially', async () => {
     render(<VocabPractice />)
     expect(screen.getByText(/loading/i)).toBeInTheDocument()

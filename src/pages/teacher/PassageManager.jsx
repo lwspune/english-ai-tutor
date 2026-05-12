@@ -19,6 +19,7 @@ export default function PassageManager() {
   const [expandedPassageId, setExpandedPassageId] = useState(null)
   const [questionsByPassage, setQuestionsByPassage] = useState({})
   const [questionCounts, setQuestionCounts] = useState({})
+  const [saveError, setSaveError] = useState('')
 
   useEffect(() => { loadPassages() }, [])
 
@@ -60,35 +61,43 @@ export default function PassageManager() {
   async function handleSave(e) {
     e.preventDefault()
     setSaving(true)
+    setSaveError('')
     const wordCount = form.content.trim().split(/\s+/).length
-    if (editingPassageId) {
-      await supabase.from('passages').update({
-        title: form.title,
-        content: form.content.trim(),
-        grade_level: form.grade_level,
-        difficulty: form.difficulty,
-        word_count: wordCount,
-      }).eq('id', editingPassageId)
-    } else {
-      await supabase.from('passages').insert({
-        title: form.title,
-        content: form.content.trim(),
-        grade_level: form.grade_level,
-        difficulty: form.difficulty,
-        word_count: wordCount,
-        created_by: profile.id,
-      })
+    const { error } = editingPassageId
+      ? await supabase.from('passages').update({
+          title: form.title,
+          content: form.content.trim(),
+          grade_level: form.grade_level,
+          difficulty: form.difficulty,
+          word_count: wordCount,
+        }).eq('id', editingPassageId)
+      : await supabase.from('passages').insert({
+          title: form.title,
+          content: form.content.trim(),
+          grade_level: form.grade_level,
+          difficulty: form.difficulty,
+          word_count: wordCount,
+          created_by: profile.id,
+        })
+    setSaving(false)
+    if (error) {
+      setSaveError(error.message || 'Save failed. Please try again.')
+      return
     }
     setForm(EMPTY_FORM)
     setEditingPassageId(null)
     setShowForm(false)
-    setSaving(false)
     loadPassages()
   }
 
   async function handleDelete(id) {
     if (!confirm('Delete this passage?')) return
-    await supabase.from('passages').delete().eq('id', id)
+    setSaveError('')
+    const { error } = await supabase.from('passages').delete().eq('id', id)
+    if (error) {
+      setSaveError(error.message || 'Delete failed. Please try again.')
+      return
+    }
     loadPassages()
   }
 
@@ -162,6 +171,11 @@ export default function PassageManager() {
       </header>
 
       <main className="max-w-3xl mx-auto px-4 py-6 space-y-5">
+        {saveError && (
+          <div role="alert" className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+            {saveError}
+          </div>
+        )}
         {showForm && (
           <form onSubmit={handleSave} className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
             <h2 className="text-sm font-semibold text-slate-700">

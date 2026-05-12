@@ -75,24 +75,9 @@ Shows on the first load of `StudentHome` each new Mon–Sun week (IST). Displays
 ### Performance
 - Avoid N+1 queries — batch Supabase calls where possible. Avoid unnecessary React re-renders. Keep the bundle lean by code-splitting routes. Don't optimise prematurely — only when there is a measured problem.
 
-## Commands
+## Operations
 
-```bash
-npm run dev        # start dev server (localhost:5173)
-npm run build      # production build → dist/
-npm run lint       # ESLint
-npm run preview    # preview production build locally
-```
-
-Edge functions (Deno, always deploy with `--no-verify-jwt`). On Windows CMD:
-```cmd
-set SUPABASE_ACCESS_TOKEN=<token>
-npx supabase functions deploy analyze-reading --no-verify-jwt
-npx supabase functions deploy create-student --no-verify-jwt
-npx supabase functions deploy reset-student-password --no-verify-jwt
-npx supabase functions deploy send-reminders --no-verify-jwt
-```
-In bash (Git Bash / WSL): `SUPABASE_ACCESS_TOKEN=<token> npx supabase functions deploy <name> --no-verify-jwt`
+Deployment commands, environment variables, manual procedures, and production quirks live in [`OPERATIONS.md`](./OPERATIONS.md). Active product priorities live in [`ROADMAP.md`](./ROADMAP.md).
 
 ## Architecture
 
@@ -231,76 +216,40 @@ After a reading session, if the passage has questions attached:
 
 ### Phase 1 forced-alignment spike (in progress — not yet a production feature)
 
-A validation effort to replace Whisper as the scoring engine with CTC forced alignment. Whisper's LM smoothing inflates accuracy on weak/fast readers (n=2 spike: clean read scored Whisper 100% vs FA 56%). FA is structurally accent-tolerant once a rule layer is applied. Cost trajectory: ~$135/mo Whisper → ~$10/mo Fly.io-hosted FA service.
+Spike infrastructure that lives in the repo. *Why* the spike exists and *what's chosen* belong in the Decisions log below; *current state* (round count, threshold verdict, next steps) lives in `memory/project_fa_spike.md`.
 
-- `services/forced-alignment/ie-v1.json` — versioned Indian-English phoneme tolerance rules (th-stopping, /v/-/w/ merger, retroflex /t/-/d/, epenthetic vowels in clusters). Drafted but not yet applied — Phase 1 service will consume it.
-- `scripts/spike/spike_fa.py` — standalone CTC forced-alignment scorer (wav2vec2-base-960h + torchaudio `forced_align` + Python stdlib `wave` for decoded WAV reading). Run via the venv at `scripts/spike/.venv/`.
-- `scripts/spike/spike_compare.py` — orchestrator. Reads a manifest JSON of `{session_id, passage_text, whisper: {...}}`, calls `spike-audio-url` to download retained audio, runs FA, writes `spike-audio/results.csv` and per-session detail JSONs.
-- `scripts/spike/inspect_detail.py` — ad-hoc analyser of FA detail JSON (score distributions, low-scoring words). Used to diagnose threshold + status mapping issues.
+- `services/forced-alignment/ie-v1.json` — Indian-English phoneme tolerance rules (th-stopping, /v/-/w/ merger, retroflex /t/-/d/, epenthetic vowels). Drafted; not yet wired into a service.
+- `scripts/spike/spike_fa.py` — standalone CTC forced-alignment scorer (wav2vec2-base-960h + torchaudio `forced_align` + stdlib `wave`). Run via the venv at `scripts/spike/.venv/`.
+- `scripts/spike/spike_compare.py` — orchestrator. Reads a manifest, downloads retained audio via `spike-audio-url`, runs FA, writes `spike-audio/results.csv` + per-session detail JSON.
+- `scripts/spike/inspect_detail.py` — ad-hoc analyser of detail JSON (score distributions, low-scoring words).
 - `scripts/spike/README.md` — setup + run instructions.
-- `spike-audio/` — gitignored output dir; captured `.webm` files, `details/*.json`, and `results.csv` live here during a spike run. Cleanup via `spike-cleanup` edge function once the round is done.
-
-Live state of the spike (count, recent verdict, next steps) is tracked in `memory/project_fa_spike.md`, not in this file.
-
-### Known production quirks
-- **Edge function must be deployed with `--no-verify-jwt`** — Supabase's new `sb_publishable_...` key format is not a JWT, so the runtime rejects requests otherwise.
-- **On Windows CMD, `KEY=value command` syntax doesn't work** — use `set KEY=value` then the command on a separate line. In bash (Git Bash / WSL) the inline syntax works fine.
-- **`handle_new_user` must qualify `public.profiles` and pin `search_path = public`** — installing `pg_cron` / `pg_net` (migration 013) shifted the function's resolved schemas, so unqualified `profiles` started failing with `relation "profiles" does not exist`. Symptom: `auth.admin.createUser` returned an error and `auth.users` had no row. Fix was applied via `apply_migration` (`handle_new_user_search_path`) but is not yet captured as a numbered migration file in the repo.
-- **Resend domain verification:** sender `tutor@lwspune.in` requires the domain to be verified on Resend (SPF + DKIM DNS records). Until verified, Resend returns `403 "domain not verified"` and `Promise.allSettled` swallows the error so users get created without a welcome email. Pending — see `memory/project_pending_resend.md`.
-- **Creating teacher accounts manually:** Supabase Auth dashboard doesn't set `raw_user_meta_data` at creation time, so the trigger inserts with default role `student`. Always follow up with a manual SQL insert into `profiles` for the correct role/name.
-- **Email confirmation:** If Supabase Auth email confirmation is enabled, students see a "check your email" screen after signup. For school use, consider disabling it (Auth → Settings → disable email confirmations).
-- **Storage RLS:** `storage.objects` has a policy `students can upload audio` allowing authenticated users to upload to their own folder (`{uid}/...`). Service role in the edge function bypasses this for downloads.
-- **Class code:** Set once by migration (random 6-char hex). To change it: `update app_settings set class_code = 'NEWCODE' where id = true;`
-- **Vercel repo visibility:** The repo is public on GitHub. Vercel Hobby plan blocks deployment of commits from non-member collaborators on private repos — making the repo public was the fix. If the repo is ever made private again, all committers must be added as Vercel team members (requires a paid plan).
-- **Creating student accounts:** Use the "Add Student" button on the teacher dashboard (single or CSV bulk). For emergency SQL inserts: use `auth.users` directly with `crypt(password, gen_salt('bf'))` and `raw_user_meta_data: { full_name, role: 'student', grade }` — do NOT use the Supabase dashboard UI as it doesn't set `raw_user_meta_data`.
-
-### Environment variables
-Frontend (`.env.local`):
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_ANON_KEY` (new format: `sb_publishable_...`)
-
-Edge function secrets (Supabase dashboard → Edge Functions → Secrets):
-- `OPENAI_API_KEY` — used for both Whisper and GPT-4o-mini
-- `RESEND_API_KEY` — used by `create-student` (welcome emails) and `send-reminders` (activation/re-engagement emails)
-- `SUPABASE_SERVICE_ROLE_KEY` (auto-injected by Supabase runtime)
+- `spike-audio/` — gitignored output dir; cleaned up via the `spike-cleanup` edge function after a round.
 
 ### Decisions log
 
-Key product and architecture decisions captured here so future sessions don't re-debate them.
+Key product and architecture decisions, grouped by area, so future sessions don't re-debate them.
+
+#### Scoring & content
 
 | Decision | Chosen | Why |
 |---|---|---|
-| Daily session limit scope | Class-wide (one value in `app_settings`) | Per-student overrides add complexity with little learning benefit; teacher can adjust the global limit |
-| Daily limit enforcement | Server-side in edge function (fetched from DB, not trusted from client) | Client-side only is trivially bypassed; server fetch adds one extra DB read which is acceptable |
 | AI feedback flag | Passed from client, not re-fetched server-side | Not security-critical — a student enabling their own AI feedback is harmless |
-| Day boundary timezone | IST throughout (client and edge function) | All users are in the same school; IST midnight is the natural reset point |
 | Comprehension grading | Server-side RPC; `correct_index` never sent to client | Prevents client-side cheating; once-only enforced in the RPC |
-| Confirmation modal before comprehension submit | Required | Quiz is irreversible; modal prevents accidental submission |
-| Leaderboards | Explicitly excluded | Demotivate the bottom half of the class in a known-peer setting |
-| MBA as a grade level | `grade`/`grade_level` stored as `text` (not int) | Allows non-numeric grade labels; migration 009 cast existing int values to text |
-| Creating student accounts manually | Insert directly into `auth.users` via SQL (not via dashboard) | Supabase dashboard doesn't set `raw_user_meta_data` at creation time; direct SQL insert lets the `handle_new_user` trigger fire correctly with grade and role |
-| Teacher adds students from dashboard | `create-student` edge function (service role); teacher-set password; `email_confirm: true` | Service role key cannot be in the browser; teacher-set password is simpler than invite email for a school context where teachers distribute credentials |
-| CSV bulk import | Client-side parse (native FileReader + split); validation preview before import; same edge function as single-add (array payload) | No library needed for simple CSV; previewing errors before import prevents surprises |
-| Teacher resets student password | `reset-student-password` edge function; guards against resetting non-student accounts | Requires service role; guard prevents a teacher accidentally resetting another teacher's password |
-| OpenAI cost tracking | Store raw metrics (`whisper_duration_seconds`, `llm_input_tokens`, `llm_output_tokens`); compute cost in JS at render time | Raw metrics survive pricing changes; `costUtils.js` is the single place to update rates |
-| Weekly summary trigger | localStorage (key per student ID) not server-side column | No migration needed; acceptable risk of reset on browser clear; simpler than a DB column for low-stakes feature |
-| Assigned passages pagination | 5 per page, client-side slice of already-fetched array | No extra DB queries; all passages already fetched on load; 5 fits comfortably on a phone screen |
-| Recent sessions storage | Store all sessions in state (was capped at 10) | Needed for correct pagination; sessions array is small (students rarely exceed 100 total) |
-| UI colour system | `slate-*` for neutrals, `indigo-*` for primary actions; red/green/amber retained as semantic colours | Consistent single palette across all components; gray/blue were mixed inconsistently before |
-| StudentHome layout | Segmented tabs (To Read / Practise / History) + hero card for next-up passage | Hero gives the student a clear single call to action; tabs reduce visual noise vs three stacked lists |
-| TeacherDashboard header | Split identity row + controls strip | Cramped single-row header wrapped on laptop screens; separation makes each group of controls scannable |
-| TeacherDashboard stat chips | 3 summary chips (Students / Sessions / Avg Accuracy) computed from already-fetched student list | Teacher needs a class pulse at a glance before drilling into rows; no extra DB query needed |
-| Colour-only UI changes | No new tests required | Presentational changes carry no behaviour to test; existing tests already verify component renders correctly |
-| Self-service password reset | `supabase.auth.resetPasswordForEmail` called from frontend (no edge function); landing page is `/reset-password` | Built-in Supabase flow is rate-limited (2/hour) and free; an edge function would just be a wrapper |
-| Activation flow uses recovery links | `admin.generateLink({ type: 'recovery' })` in welcome/activation emails, not stored plaintext passwords | Same UX as forgot-password; works for re-engagement of existing users; avoids exposing teacher-set passwords in email |
-| Reminder scheduling | pg_cron + pg_net inside Supabase, not external cron service | Stays on the existing stack; cron secret in `app_settings` shared with edge function for auth |
-| Email provider | Resend with custom domain (`tutor@lwspune.in`) | Owned-domain sender for trust; Supabase invite emails were skipped because they don't fit a teacher-distributed-credentials flow |
-| Recovery email template | Customised once via Management API to serve both first-time activation and password reset | Supabase only has one `recovery` template — copy is written generically ("set your password") to fit both contexts |
-| Passage ordering on StudentHome | Sort by difficulty (easy → moderate → hard), tiebreak by `created_at` ASC; client-side via `sortByDifficulty` | PostgREST sorts text columns alphabetically (`easy, hard, moderate` — wrong order), so a pure helper is the right place. Teacher views still order by `created_at DESC` |
 | MCQ option order randomised on save | `QuestionPanel.handleSubmit` calls `shuffleOptions` before insert/update; bulk re-shuffle migration ran on all 266 existing questions (backup in `questions_backup_preshuffle` until dropped) | LLM-generated MCQs (especially MBA-level) skewed heavily — 21 of 30 5-question passages had every answer as "B". Students could pick B and pass. Word-level shuffling preserves the correct option's text and prevents future drift. |
+| OpenAI cost tracking | Store raw metrics (`whisper_duration_seconds`, `llm_input_tokens`, `llm_output_tokens`); compute cost in JS at render time | Raw metrics survive pricing changes; `costUtils.js` is the single place to update rates |
+
+#### Phase 1 scoring spike (Whisper → forced alignment)
+
+| Decision | Chosen | Why |
+|---|---|---|
 | Phase 1 scoring engine | Migrate from Whisper to CTC forced alignment on Fly.io (Mumbai region), word-level scoring only, accent-tolerance rules applied post-alignment | Whisper's LM smooths real reading errors (regressive bias — biggest lift goes to weakest readers), corrupting the mastery gate. FA scoring is structurally honest. Self-hosted is cost-flat vs Whisper's per-minute pricing. |
 | Accent-bias defense | Layered: (1) word-level scoring (not phoneme) for grading, (2) IE-aware acoustic model when available, (3) JSON ruleset of tolerated phoneme substitutions (`services/forced-alignment/ie-v1.json`). Default stance: "when ambiguous, favour 'correct'" | Indian English speakers systematically substitute /θ/→/t/, /v/↔/w/, etc. — these are legitimate dialect features, not errors. Penalising them is pedagogically wrong. Word-level scoring is robust across accents; phoneme rules cover the remaining cases. |
 | Phase 1 spike methodology | Toggle `spike_audio_retention`, capture N production sessions, re-score with FA, compare CSV to Whisper — instead of synthetic test audio | Real production audio is the only honest validator. Avoids synthetic-audio bias and forces us to handle the real WebM/Opus pipeline. Capture is gated by a per-session atomic counter so we never accidentally retain more than configured. |
+
+#### Vocabulary
+
+| Decision | Chosen | Why |
+|---|---|---|
 | Vocabulary practice scope (v1) | Standalone deck flow at `/student/vocab*`, grade-gated to 11+, MCQ-only (synonym + antonym alternation), Leitner 5-box SRS, no audio | NDA-prep audience needs synonym/antonym recognition more than pronunciation. Pure-MCQ ships in a week. Read-aloud + TTS audio waits for v2 after Phase 1 FA migration so vocab scoring auto-improves rather than carrying Whisper inflation. |
 | Vocabulary seeding | Generated in-conversation via Claude (this assistant), saved as `scripts/vocab/entries.json` + `batch_*.json`, uploaded via the `vocab-insert` edge function | User chose Claude over OpenAI for the seed pass: zero extra vendor cost (already paying for the conversation), better contextual control over school tone. One-shot operation, repeatability provided by `entries.json` + `upload.py` rather than the LLM call itself. |
 | Vocabulary mastery rule (v1) | `srs_box = 5 AND correct_count >= 3` sets `mastered_at` and it sticks — failed attempts on mastered words bump `total_encounters` but never un-master. | Avoids the inconsistent state "previously mastered but currently in box 1". Maintenance check resurfacing is a v2 concern. Pragmatic v1 simplification. |
@@ -309,14 +258,45 @@ Key product and architecture decisions captured here so future sessions don't re
 | Retention quiz counts as practice | Quiz answers in SessionReport call `grade_vocab_attempt` (same RPC as deck practice). Persisted to `sessions.vocab_retention_answers` for once-only enforcement. | Reading is exposure (no SRS change). A quiz is active recall, identical cognitive work to deck practice — must affect SRS state too. Treating it differently would be philosophically inconsistent. |
 | Retention quiz cap by passage length | 1 question if <100 words; 2 if 100–199; 3 if 200+. Hidden if no vocab matches or all matches mastered. Skippable via "Skip" button. | Scales with attention budget. School context with minors — don't pile on. Skip respects student autonomy; the quiz comes back next session anyway via the deck. |
 | Reading-as-vocab-exposure (v2.1) | Reading a passage bumps `total_encounters` for any vocab word in the passage but does NOT change SRS state (`srs_box`, `correct_count`, `next_review_at`, `mastered_at` unchanged). Both hits and misses count as exposure. Source tracked via `last_encounter_source = 'reading'`. | Reading is passive recognition, not active recall — SRS is meant for active practice. Counting reading exposures as mastery progress would let students master words without actively recalling them, defeating the gate. Tracking source still gives the UI a way to surface "X words encountered through your reading." |
-| Engagement polish layer | Audio (Web Audio synth — no assets), haptics (Vibration API), confetti (CSS-only), card-pulse/shake on selected MCQ options, springy sheets. Defaults: sound ON, haptics ON, per-device localStorage prefs. Settings reachable from a gear icon on `StudentHome`. | Retention is a learning lever — students who come back, practice; students who practice, improve. Polish that makes the app feel responsive raises return rate. Synthesised sound + CSS confetti add zero dependencies. Per-device defaults (not server-side) keep the feature classroom-friendly: a student can mute on a shared phone without altering their account. |
-| Engagement-polish guardrails | Confetti and card animations are suppressed by `prefers-reduced-motion`; sound and haptics still fire (audio/vibration are not "motion" in the WCAG sense). Celebration cues only fire on *genuine* learning events: personal best, comprehension ≥80%, first-mastery of a word, streak crossing 5/10/20. No variable-reward or loss-aversion patterns. | Honours accessibility prefs without silencing legitimate confirmation feedback. Keeps the school-context guardrail in CLAUDE.md (no slot-machine patterns) while still delivering the felt experience. |
 | First-mastery detection (client-side) | `VocabPractice` reads the pre-answer `student_word_progress` row from a `progressMap` built at load. On a correct answer, computes whether the answer would tip the word into mastery (`srs_box ≥ MAX_BOX - 1 AND correct_count + 1 ≥ MASTERY_CORRECT_THRESHOLD AND !mastered_at`) and fires `Confetti` + `feedback('celebrate')` in place of the normal `feedback('correct')`. | Avoided a migration to enhance `grade_vocab_attempt` to return a `newly_mastered` flag. Client already has the pre-state from the deck-assembly fetch; deriving the prediction from the SRS rule is cheap and migration-free. If the rule ever diverges from the RPC, the client check will need to track. |
 
-### Adding teacher accounts (manual process)
-```sql
--- After creating user in Auth dashboard (email + password only):
-insert into profiles (id, full_name, role, grade)
-select id, 'Full Name', 'teacher', null
-from auth.users where email = 'teacher@school.com';
-```
+#### Engagement & UI
+
+| Decision | Chosen | Why |
+|---|---|---|
+| Leaderboards | Explicitly excluded | Demotivate the bottom half of the class in a known-peer setting |
+| Confirmation modal before comprehension submit | Required | Quiz is irreversible; modal prevents accidental submission |
+| UI colour system | `slate-*` for neutrals, `indigo-*` for primary actions; red/green/amber retained as semantic colours | Consistent single palette across all components; gray/blue were mixed inconsistently before |
+| Colour-only UI changes | No new tests required | Presentational changes carry no behaviour to test; existing tests already verify component renders correctly |
+| StudentHome layout | Segmented tabs (To Read / Practise / History) + hero card for next-up passage | Hero gives the student a clear single call to action; tabs reduce visual noise vs three stacked lists |
+| TeacherDashboard header | Split identity row + controls strip | Cramped single-row header wrapped on laptop screens; separation makes each group of controls scannable |
+| TeacherDashboard stat chips | 3 summary chips (Students / Sessions / Avg Accuracy) computed from already-fetched student list | Teacher needs a class pulse at a glance before drilling into rows; no extra DB query needed |
+| Passage ordering on StudentHome | Sort by difficulty (easy → moderate → hard), tiebreak by `created_at` ASC; client-side via `sortByDifficulty` | PostgREST sorts text columns alphabetically (`easy, hard, moderate` — wrong order), so a pure helper is the right place. Teacher views still order by `created_at DESC` |
+| Assigned passages pagination | 5 per page, client-side slice of already-fetched array | No extra DB queries; all passages already fetched on load; 5 fits comfortably on a phone screen |
+| Recent sessions storage | Store all sessions in state (was capped at 10) | Needed for correct pagination; sessions array is small (students rarely exceed 100 total) |
+| Weekly summary trigger | localStorage (key per student ID) not server-side column | No migration needed; acceptable risk of reset on browser clear; simpler than a DB column for low-stakes feature |
+| Engagement polish layer | Audio (Web Audio synth — no assets), haptics (Vibration API), confetti (CSS-only), card-pulse/shake on selected MCQ options, springy sheets. Defaults: sound ON, haptics ON, per-device localStorage prefs. Settings reachable from a gear icon on `StudentHome`. | Retention is a learning lever — students who come back, practice; students who practice, improve. Polish that makes the app feel responsive raises return rate. Synthesised sound + CSS confetti add zero dependencies. Per-device defaults (not server-side) keep the feature classroom-friendly: a student can mute on a shared phone without altering their account. |
+| Engagement-polish guardrails | Confetti and card animations are suppressed by `prefers-reduced-motion`; sound and haptics still fire (audio/vibration are not "motion" in the WCAG sense). Celebration cues only fire on *genuine* learning events: personal best, comprehension ≥80%, first-mastery of a word, streak crossing 5/10/20. No variable-reward or loss-aversion patterns. | Honours accessibility prefs without silencing legitimate confirmation feedback. Keeps the school-context guardrail in CLAUDE.md (no slot-machine patterns) while still delivering the felt experience. |
+
+#### Auth & user management
+
+| Decision | Chosen | Why |
+|---|---|---|
+| MBA as a grade level | `grade`/`grade_level` stored as `text` (not int) | Allows non-numeric grade labels; migration 009 cast existing int values to text |
+| Creating student accounts manually | Insert directly into `auth.users` via SQL (not via dashboard) | Supabase dashboard doesn't set `raw_user_meta_data` at creation time; direct SQL insert lets the `handle_new_user` trigger fire correctly with grade and role |
+| Teacher adds students from dashboard | `create-student` edge function (service role); teacher-set password; `email_confirm: true` | Service role key cannot be in the browser; teacher-set password is simpler than invite email for a school context where teachers distribute credentials |
+| CSV bulk import | Client-side parse (native FileReader + split); validation preview before import; same edge function as single-add (array payload) | No library needed for simple CSV; previewing errors before import prevents surprises |
+| Teacher resets student password | `reset-student-password` edge function; guards against resetting non-student accounts | Requires service role; guard prevents a teacher accidentally resetting another teacher's password |
+| Self-service password reset | `supabase.auth.resetPasswordForEmail` called from frontend (no edge function); landing page is `/reset-password` | Built-in Supabase flow is rate-limited (2/hour) and free; an edge function would just be a wrapper |
+| Activation flow uses recovery links | `admin.generateLink({ type: 'recovery' })` in welcome/activation emails, not stored plaintext passwords | Same UX as forgot-password; works for re-engagement of existing users; avoids exposing teacher-set passwords in email |
+| Recovery email template | Customised once via Management API to serve both first-time activation and password reset | Supabase only has one `recovery` template — copy is written generically ("set your password") to fit both contexts |
+
+#### Infrastructure & deployment
+
+| Decision | Chosen | Why |
+|---|---|---|
+| Daily session limit scope | Class-wide (one value in `app_settings`) | Per-student overrides add complexity with little learning benefit; teacher can adjust the global limit |
+| Daily limit enforcement | Server-side in edge function (fetched from DB, not trusted from client) | Client-side only is trivially bypassed; server fetch adds one extra DB read which is acceptable |
+| Day boundary timezone | IST throughout (client and edge function) | All users are in the same school; IST midnight is the natural reset point |
+| Reminder scheduling | pg_cron + pg_net inside Supabase, not external cron service | Stays on the existing stack; cron secret in `app_settings` shared with edge function for auth |
+| Email provider | Resend with custom domain (`tutor@lwspune.in`) | Owned-domain sender for trust; Supabase invite emails were skipped because they don't fit a teacher-distributed-credentials flow |

@@ -178,6 +178,45 @@ describe('ReadingSession — recording indicator', () => {
   })
 })
 
+// ─── Sticky bottom recording bar ──────────────────────────────────────────────
+
+describe('ReadingSession — sticky bottom recording bar', () => {
+  it('renders recording controls inside a fixed-position bottom bar', async () => {
+    render(<ReadingSession />)
+    const bar = await screen.findByTestId('recording-bar')
+    expect(bar).toBeInTheDocument()
+    expect(bar.className).toMatch(/\bfixed\b/)
+    expect(bar.className).toMatch(/\bbottom-0\b/)
+  })
+
+  it('places the Start Recording button inside the recording bar', async () => {
+    render(<ReadingSession />)
+    const bar = await screen.findByTestId('recording-bar')
+    const startButton = await screen.findByRole('button', { name: /start recording/i })
+    expect(bar.contains(startButton)).toBe(true)
+  })
+
+  it('shows the "tap Start below" hint above the passage when idle', async () => {
+    render(<ReadingSession />)
+    await waitFor(() => screen.getByRole('button', { name: /start recording/i }))
+    expect(screen.getByTestId('start-hint')).toBeInTheDocument()
+  })
+
+  it('hides the "tap Start below" hint once recording has started', async () => {
+    mockRecorderState.recording = true
+    render(<ReadingSession />)
+    await waitFor(() => screen.getByRole('button', { name: /stop recording/i }))
+    expect(screen.queryByTestId('start-hint')).not.toBeInTheDocument()
+  })
+
+  it('hides the "tap Start below" hint once a recording has been captured', async () => {
+    mockRecorderState.audioBlob = new Blob(['x'], { type: 'audio/webm' })
+    render(<ReadingSession />)
+    await waitFor(() => screen.getByRole('button', { name: /submit/i }))
+    expect(screen.queryByTestId('start-hint')).not.toBeInTheDocument()
+  })
+})
+
 // ─── Identity hardening (Finding 3) ───────────────────────────────────────────
 
 describe('ReadingSession — invoke body shape (Finding 3)', () => {

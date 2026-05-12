@@ -78,6 +78,8 @@ export default function ReadingSession() {
     )
   }
 
+  const showStartHint = !recording && !audioBlob && !submitting
+
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3">
@@ -90,19 +92,29 @@ export default function ReadingSession() {
         <h1 className="text-base font-semibold text-slate-800">{passage.title}</h1>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-4 space-y-4">
+      <main className="max-w-2xl mx-auto px-4 py-4 pb-44 space-y-3">
+        {showStartHint && (
+          <p data-testid="start-hint" className="text-xs text-slate-500 text-center">
+            Read aloud — tap <span className="font-semibold text-slate-700">Start Recording</span> below when you're ready.
+          </p>
+        )}
         <div className="bg-white rounded-2xl shadow-sm p-6">
           <p className="text-slate-800 leading-relaxed text-lg">{passage.content}</p>
         </div>
+      </main>
 
-        <div className="bg-white rounded-2xl shadow-sm p-5 space-y-4">
+      <div
+        data-testid="recording-bar"
+        className="fixed inset-x-0 bottom-0 z-40 bg-white border-t border-slate-200 shadow-[0_-2px_12px_rgba(0,0,0,0.06)] pb-[env(safe-area-inset-bottom,0)]"
+      >
+        <div className="max-w-2xl mx-auto px-4 py-3 space-y-2">
           {dailyLimitReached && (
             <p className="text-xs text-center font-medium text-red-500">
               You've reached today's limit of {dailyLimit} passages. Come back tomorrow.
             </p>
           )}
-          {!dailyLimitReached && attemptCount !== null && (
-            <p className={`text-xs text-center font-medium ${attemptCount >= 3 ? 'text-red-500' : 'text-slate-400'}`}>
+          {!dailyLimitReached && attemptCount !== null && !recording && (
+            <p className={`text-xs text-center font-medium ${attemptCount >= 3 ? 'text-red-500' : 'text-slate-500'}`}>
               {attemptCount >= 3
                 ? 'You have used all 3 attempts for this passage.'
                 : `Attempt ${attemptCount + 1} of 3`}
@@ -110,23 +122,27 @@ export default function ReadingSession() {
           )}
 
           {recording && (
-            <div className="flex flex-col items-center gap-2">
+            <div className="flex items-center justify-center gap-3">
               <span
                 data-testid="recording-pulse"
-                className="w-4 h-4 bg-red-500 rounded-full animate-pulse"
+                className="w-3 h-3 bg-red-500 rounded-full animate-pulse"
               />
-              <p className={`text-3xl font-bold tabular-nums ${remaining <= 30 ? 'text-red-500' : 'text-slate-700'}`}>
+              <p className={`text-2xl font-bold tabular-nums ${remaining <= 30 ? 'text-red-500' : 'text-slate-700'}`}>
                 {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')}
               </p>
-              <p className="text-xs text-slate-400">Recording — read the passage aloud</p>
+              <p className="text-xs text-slate-400">Reading aloud…</p>
             </div>
           )}
 
-          {!recording && (
-            <p className="text-sm font-medium text-slate-600 text-center">
-              {autoStopped ? 'Recording stopped — time limit reached'
-                : audioBlob ? 'Recording complete'
-                : 'Press Start when ready to read'}
+          {!recording && !audioBlob && !submitting && autoStopped && (
+            <p className="text-xs text-center font-medium text-slate-600">
+              Recording stopped — time limit reached
+            </p>
+          )}
+
+          {audioBlob && !recording && !submitting && (
+            <p className="text-xs text-center font-medium text-slate-600">
+              Recording complete — Submit to score, or Re-record to try again.
             </p>
           )}
 
@@ -173,9 +189,9 @@ export default function ReadingSession() {
             )}
           </div>
 
-          {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+          {error && <p className="text-red-500 text-xs text-center">{error}</p>}
         </div>
-      </main>
+      </div>
     </div>
   )
 }

@@ -42,7 +42,15 @@ Keep entries to ~5–10 lines. If a decision needs more rationale, link to a mem
 
 **Revisit trigger:** if <10 unique students have drilled in 30 days, the surface isn't pulling weight — either UX issue or no-stumbles-to-drill content issue. If <60% was-correct rate across students with clean accuracy on the original session, Whisper noise is the culprit and FA migration accelerates.
 
-## 2026-05-12 — Retrofit 5 grade-12 passages to validate the reading→vocab loop before regenerating the rest
+## 2026-05-12 — Pin ReadingSession recording controls to a sticky bottom bar
+
+**Decision:** Move the Start/Stop/Submit/Re-record controls out of the post-passage card and into a `fixed inset-x-0 bottom-0` bar that's always visible. Add a one-line subdued hint above the passage ("Read aloud — tap Start Recording below when you're ready") shown only when idle.
+
+**Context:** User-observed UX bug — students miss the Start Recording button because it sits below the fold (passage card takes most of the viewport on mobile, especially for 200+ word passages). They orient to the passage, start reading silently, and don't realise they need to tap Start until the recording window has shifted out from under them. Considered: (1) move controls above passage — breaks top-down reading flow; (2) onboarding overlay — solves first session only, students forget across weeks; (3) dim passage until recording — fights legitimate silent-preview behaviour (which is good reading prep). Sticky bar is the standard mobile pattern (Uber confirm, Stripe checkout) and preserves silent preview.
+
+**Watch:** First-15-seconds-of-passage accuracy across new sessions vs. the pre-fix baseline. If the bug was real, the `word_results[0..N]` should show fewer omissions in the first chunk. Also watch raw student feedback (drill misclassifications often surface from "I started reading before recording started" type complaints).
+
+**Revisit trigger:** 4 weeks (2026-06-09). If sessions still show the pattern of "first paragraph systematically more wrong than later paragraphs," the fix didn't take and we revisit (maybe option 3 — dim passage until recording — becomes the right call). If accuracy normalises, decision sticks.
 
 **Decision:** Hand-retrofit 5 grade-12 passages (Trees, Discipline, Honesty, Mental Health Awareness, The Power of Empathy) with 6–9 NDA-list words each. Don't drop+regenerate the remaining 25 passages yet, despite a real argument for doing so eventually.
 

@@ -251,7 +251,7 @@ Key product and architecture decisions, grouped by area, so future sessions don'
 |---|---|---|
 | AI feedback flag | Passed from client, not re-fetched server-side | Not security-critical — a student enabling their own AI feedback is harmless |
 | Comprehension grading | Server-side RPC; `correct_index` never sent to client | Prevents client-side cheating; once-only enforced in the RPC |
-| MCQ option order randomised on save | `QuestionPanel.handleSubmit` calls `shuffleOptions` before insert/update; bulk re-shuffle migration ran on all 266 existing questions (backup in `questions_backup_preshuffle` until dropped) | LLM-generated MCQs (especially MBA-level) skewed heavily — 21 of 30 5-question passages had every answer as "B". Students could pick B and pass. Word-level shuffling preserves the correct option's text and prevents future drift. |
+| MCQ option order randomised on save | `QuestionPanel.handleSubmit` calls `shuffleOptions` before insert/update; bulk re-shuffle migration ran on all 266 existing questions. Pre-shuffle backup table dropped in migration 027 after weeks of stable shuffled state (69 comp attempts, avg 93%). | LLM-generated MCQs (especially MBA-level) skewed heavily — 21 of 30 5-question passages had every answer as "B". Students could pick B and pass. Word-level shuffling preserves the correct option's text and prevents future drift. |
 | OpenAI cost tracking | Store raw metrics (`whisper_duration_seconds`, `llm_input_tokens`, `llm_output_tokens`); compute cost in JS at render time | Raw metrics survive pricing changes; `costUtils.js` is the single place to update rates |
 
 #### Phase 1 scoring spike (Whisper → forced alignment)

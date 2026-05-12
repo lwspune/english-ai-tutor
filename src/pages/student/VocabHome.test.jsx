@@ -225,3 +225,85 @@ describe('VocabHome — reading encounters', () => {
     expect(screen.queryByTestId('seen-from-reading')).not.toBeInTheDocument()
   })
 })
+
+describe('VocabHome — in-progress + due-soon + expectation', () => {
+  it('shows in-progress count when student has seen words but none mastered', async () => {
+    // Shreya-shaped: 38 seen, 0 mastered, 31 with next_review in 24-72h, 7 in 24h
+    const futureSoon = new Date(Date.now() + 60 * 60 * 1000).toISOString() // 1h
+    const futureLater = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString() // 48h
+    const rows = []
+    for (let i = 0; i < 7; i++) rows.push({ mastered_at: null, next_review_at: futureSoon })
+    for (let i = 0; i < 31; i++) rows.push({ mastered_at: null, next_review_at: futureLater })
+    mockProgress.value = rows
+    render(<VocabHome />)
+    await screen.findByRole('button', { name: /start practice/i })
+    expect(screen.getByTestId('in-progress-count')).toHaveTextContent('38')
+  })
+
+  it('hides in-progress count when zero', async () => {
+    mockProgress.value = []
+    render(<VocabHome />)
+    await screen.findByRole('button', { name: /start practice/i })
+    expect(screen.queryByTestId('in-progress-count')).not.toBeInTheDocument()
+  })
+
+  it('does not include mastered words in the in-progress count', async () => {
+    const past = new Date(Date.now() - 86400000).toISOString()
+    mockProgress.value = [
+      { mastered_at: '2026-05-01T00:00:00Z', next_review_at: past },
+      { mastered_at: '2026-05-02T00:00:00Z', next_review_at: past },
+      { mastered_at: null, next_review_at: past },
+    ]
+    render(<VocabHome />)
+    await screen.findByRole('button', { name: /start practice/i })
+    expect(screen.getByTestId('in-progress-count')).toHaveTextContent('1')
+  })
+
+  it('shows due-soon hint when words are coming due in the next 24h', async () => {
+    const futureSoon = new Date(Date.now() + 60 * 60 * 1000).toISOString() // 1h
+    mockProgress.value = [
+      { mastered_at: null, next_review_at: futureSoon },
+      { mastered_at: null, next_review_at: futureSoon },
+    ]
+    render(<VocabHome />)
+    await screen.findByRole('button', { name: /start practice/i })
+    expect(screen.getByTestId('due-soon-hint')).toHaveTextContent('2')
+    expect(screen.getByTestId('due-soon-hint')).toHaveTextContent(/24h/i)
+  })
+
+  it('hides due-soon hint when nothing is coming in 24h', async () => {
+    const futureLater = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString()
+    mockProgress.value = [
+      { mastered_at: null, next_review_at: futureLater },
+    ]
+    render(<VocabHome />)
+    await screen.findByRole('button', { name: /start practice/i })
+    expect(screen.queryByTestId('due-soon-hint')).not.toBeInTheDocument()
+  })
+
+  it('shows mastery-timeline expectation when student has progress but no mastery', async () => {
+    const futureLater = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString()
+    mockProgress.value = [
+      { mastered_at: null, next_review_at: futureLater },
+    ]
+    render(<VocabHome />)
+    await screen.findByRole('button', { name: /start practice/i })
+    expect(screen.getByTestId('mastery-timeline-hint')).toHaveTextContent(/25\+ days/i)
+  })
+
+  it('hides mastery-timeline expectation once the student has at least one mastered word', async () => {
+    mockProgress.value = [
+      { mastered_at: '2026-05-01T00:00:00Z', next_review_at: '2026-06-01T00:00:00Z' },
+    ]
+    render(<VocabHome />)
+    await screen.findByRole('button', { name: /start practice/i })
+    expect(screen.queryByTestId('mastery-timeline-hint')).not.toBeInTheDocument()
+  })
+
+  it('hides mastery-timeline expectation for a fresh student with no progress', async () => {
+    mockProgress.value = []
+    render(<VocabHome />)
+    await screen.findByRole('button', { name: /start practice/i })
+    expect(screen.queryByTestId('mastery-timeline-hint')).not.toBeInTheDocument()
+  })
+})

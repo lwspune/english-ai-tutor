@@ -16,6 +16,7 @@ export default function VocabHome() {
   const [total, setTotal] = useState(0)
   const [mastered, setMastered] = useState(0)
   const [due, setDue] = useState(0)
+  const [dueSoon, setDueSoon] = useState(0)
   const [seen, setSeen] = useState(0)
   const [seenFromReading, setSeenFromReading] = useState(0)
 
@@ -32,12 +33,18 @@ export default function VocabHome() {
 
       const nowDate = new Date()
       const now = nowDate.getTime()
+      const in24h = now + 24 * 60 * 60 * 1000
       const rows = progress ?? []
       setTotal(totalCount ?? 0)
       setMastered(rows.filter(r => r.mastered_at).length)
       setDue(rows.filter(r => {
         if (r.mastered_at) return isDueForMaintenance(r, nowDate)
         return new Date(r.next_review_at).getTime() <= now
+      }).length)
+      setDueSoon(rows.filter(r => {
+        if (r.mastered_at) return false
+        const t = new Date(r.next_review_at).getTime()
+        return t > now && t <= in24h
       }).length)
       setSeen(rows.length)
       setSeenFromReading(rows.filter(r => r.last_encounter_source === 'reading').length)
@@ -48,6 +55,8 @@ export default function VocabHome() {
 
   const newAvailable = Math.max(0, total - seen)
   const canPractice = due > 0 || newAvailable > 0
+  const inProgress = Math.max(0, seen - mastered)
+  const showMasteryTimelineHint = seen > 0 && mastered === 0
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
@@ -93,6 +102,17 @@ export default function VocabHome() {
                   aria-label={`${mastered} of ${total} mastered`}
                 />
               </div>
+              {inProgress > 0 && (
+                <p data-testid="in-progress-count" className="text-xs text-slate-500 mt-3">
+                  <span className="font-semibold text-slate-700">{inProgress}</span>{' '}
+                  {inProgress === 1 ? 'word' : 'words'} in progress — practising your way toward mastery.
+                </p>
+              )}
+              {showMasteryTimelineHint && (
+                <p data-testid="mastery-timeline-hint" className="text-xs text-slate-400 mt-2 leading-relaxed">
+                  Words climb through 5 boxes with spaced practice. The first masteries usually take 25+ days of consistent reviews — keep going.
+                </p>
+              )}
               {seenFromReading > 0 && (
                 <p data-testid="seen-from-reading" className="text-xs text-slate-500 mt-3">
                   <span className="font-semibold text-slate-700">{seenFromReading}</span>{' '}
@@ -106,6 +126,11 @@ export default function VocabHome() {
                 <span data-testid="due-count" className="text-2xl font-bold">{due}</span>{' '}
                 {due === 1 ? 'word' : 'words'} due today
               </p>
+              {dueSoon > 0 && (
+                <p data-testid="due-soon-hint" className="text-xs text-indigo-700 mt-1">
+                  + <span className="font-semibold">{dueSoon}</span> more due within 24h
+                </p>
+              )}
               <p className="text-xs text-indigo-700 mt-1">
                 {newAvailable > 0 ? `+ up to 5 new words from ${newAvailable} unseen` : 'No new words remaining'}
               </p>

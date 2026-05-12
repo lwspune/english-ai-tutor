@@ -73,7 +73,7 @@ update app_settings set class_code = 'NEWCODE' where id = true;
 
 Sender `tutor@lwspune.in`. The domain must be verified on resend.com/domains (SPF + DKIM + return-path DNS records) or Resend returns `403 "domain not verified"`. The `create-student` edge function wraps `sendWelcomeEmail` in `Promise.allSettled`, so failures are logged but never surfaced — user creation looks successful but no email goes out. Verification status is currently pending; see `memory/project_pending_resend.md`.
 
-API key (send-only restricted): `re_KWTnMCYW_ZJLid5joiuTEhNPKr42LoxbX`.
+API key: stored as `RESEND_API_KEY` in Supabase dashboard → Edge Functions → Secrets. Send-only restricted. Used by `create-student` and `send-reminders`.
 
 ## Production quirks that have bitten us
 

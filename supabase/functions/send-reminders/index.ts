@@ -67,6 +67,11 @@ Deno.serve(async (req) => {
   let failed = 0
   const sentIds: string[] = []
 
+  // Resend free tier is 2 req/sec. The send loop hits that ceiling in tight
+  // bursts, so we throttle between Resend POSTs. The first iteration has no
+  // prior send to space from, so we only sleep before iterations after the
+  // first.
+  let isFirst = true
   for (const student of toRemind) {
     let emailPayload
 
@@ -85,6 +90,11 @@ Deno.serve(async (req) => {
     } else {
       emailPayload = buildReengagementEmail(student.name, student.email, student.lastAccuracy)
     }
+
+    if (!isFirst) {
+      await new Promise(r => setTimeout(r, 600))
+    }
+    isFirst = false
 
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',

@@ -42,3 +42,6 @@ scripts/spike/__pycache__/
 scripts/vocab/batch_*.json
 scripts/vocab/seed_chunk_*.sql
 scripts/vocab/__pycache__/
+
+# Issue/bug report drop file — read-only reference for Claude; never edit or commit
+BUGS_FOR_CLAUDE.md

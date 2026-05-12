@@ -9,11 +9,26 @@ vi.mock('react-router-dom', () => ({
 }))
 
 // vi.hoisted ensures these are available when the vi.mock factory runs
-const { mockRpc, capture, mockFeedback } = vi.hoisted(() => ({
-  mockRpc: vi.fn(),
-  capture: { questionsSelectArg: null },
-  mockFeedback: vi.fn(),
-}))
+const QUESTION_ROWS = [
+  { id: 'q1', question_text: 'Who wrote Hamlet?', options: ['Shakespeare', 'Keats', 'Austen', 'Dickens'], display_order: 0, correct_index: null },
+  { id: 'q2', question_text: 'When was it written?',  options: ['1200', '1400', '1600', '1800'],          display_order: 1, correct_index: null },
+]
+
+const { mockRpc, mockFeedback } = vi.hoisted(() => {
+  const QUESTION_ROWS_HOISTED = [
+    { id: 'q1', question_text: 'Who wrote Hamlet?', options: ['Shakespeare', 'Keats', 'Austen', 'Dickens'], display_order: 0, correct_index: null },
+    { id: 'q2', question_text: 'When was it written?',  options: ['1200', '1400', '1600', '1800'],          display_order: 1, correct_index: null },
+  ]
+  return {
+    mockRpc: vi.fn((fn) => {
+      if (fn === 'get_questions_for_session') {
+        return Promise.resolve({ data: QUESTION_ROWS_HOISTED, error: null })
+      }
+      return Promise.resolve({ data: null, error: null })
+    }),
+    mockFeedback: vi.fn(),
+  }
+})
 
 vi.mock('../../lib/feedback', () => ({
   feedback: (...args) => mockFeedback(...args),
@@ -34,21 +49,13 @@ vi.mock('../../lib/supabase', () => ({
           }),
         }
       }
-      if (table === 'questions') {
+      if (table === 'passages') {
         return {
-          select: (cols) => {
-            capture.questionsSelectArg = cols
-            return {
-              eq: () => ({
-                order: () => Promise.resolve({
-                  data: [
-                    { id: 'q1', question_text: 'Who wrote Hamlet?', options: ['Shakespeare', 'Keats', 'Austen', 'Dickens'], display_order: 0 },
-                    { id: 'q2', question_text: 'When was it written?', options: ['1200', '1400', '1600', '1800'], display_order: 1 },
-                  ],
-                }),
-              }),
-            }
-          },
+          select: () => ({
+            eq: () => ({
+              single: () => Promise.resolve({ data: { title: 'Hamlet', content: 'To be or not to be.' } }),
+            }),
+          }),
         }
       }
       return { select: () => ({ eq: () => ({ single: () => Promise.resolve({ data: null }) }) }) }
@@ -60,20 +67,24 @@ vi.mock('../../lib/supabase', () => ({
 describe('ComprehensionQuiz', () => {
   beforeEach(() => {
     mockNavigate.mockReset()
+    // Re-stash the dispatch behaviour so per-test .mockResolvedValue calls
+    // don't trash the shared get_questions_for_session shape.
     mockRpc.mockReset()
-    mockRpc.mockResolvedValue({ data: null, error: null })
-    capture.questionsSelectArg = null
+    mockRpc.mockImplementation((fn) => {
+      if (fn === 'get_questions_for_session') {
+        return Promise.resolve({ data: QUESTION_ROWS, error: null })
+      }
+      return Promise.resolve({ data: null, error: null })
+    })
     mockFeedback.mockClear()
   })
 
-  it('fetches questions without correct_index', async () => {
+  it('fetches questions through get_questions_for_session RPC (correct_index is server-gated)', async () => {
     render(<ComprehensionQuiz />)
     await waitFor(() => screen.getByText('Who wrote Hamlet?'))
-    expect(capture.questionsSelectArg).not.toContain('correct_index')
-    expect(capture.questionsSelectArg).toContain('id')
-    expect(capture.questionsSelectArg).toContain('question_text')
-    expect(capture.questionsSelectArg).toContain('options')
-    expect(capture.questionsSelectArg).toContain('display_order')
+    const call = mockRpc.mock.calls.find(args => args[0] === 'get_questions_for_session')
+    expect(call).toBeTruthy()
+    expect(call[1]).toEqual({ p_session_id: 'session-abc' })
   })
 
   it('calls grade_comprehension RPC on submit with session_id and raw answers', async () => {

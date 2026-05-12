@@ -46,7 +46,13 @@ const { sessionRef, prevSessionsRef, questionsRef, profileRef, vocabRef, progres
   progressRef: { data: [] },
   updateCalls: { value: [] },
   rpcCalls: { value: [] },
-  rpcMock: (...args) => { rpcCalls.value.push(args); return Promise.resolve({ data: {}, error: null }) },
+  rpcMock: (...args) => {
+    rpcCalls.value.push(args)
+    if (args[0] === 'get_questions_for_session') {
+      return Promise.resolve({ data: questionsRef.data, error: null })
+    }
+    return Promise.resolve({ data: {}, error: null })
+  },
   mockFeedback: vi.fn(),
   mockAwardMilestone: vi.fn(() => Promise.resolve('milestone-id')),
 }))
@@ -382,6 +388,31 @@ describe('SessionReport — vocab retention quiz', () => {
     await waitFor(() => screen.getByTestId('retention-quiz'))
     await user.click(screen.getByRole('button', { name: /^skip$/i }))
     expect(screen.queryByTestId('retention-quiz')).not.toBeInTheDocument()
+  })
+
+  it('persists retention answers via save_vocab_retention_answers RPC (not direct UPDATE)', async () => {
+    const user = (await import('@testing-library/user-event')).default.setup()
+    const realRandom = Math.random
+    Math.random = () => 0.5
+    profileRef.data = { grade: '11' }
+    // single-word passage so we only have one card to answer (passage word_count < 100)
+    vocabRef.data = [ABANDON, BRISK]
+    sessionRef.data = {
+      ...BASE_SESSION,
+      passages: { title: 'Test Passage', content: 'Abandon.' },
+      word_results: [{ word: 'Abandon', status: 'correct' }],
+    }
+    render(<SessionReport />)
+    await waitFor(() => screen.getByTestId('retention-quiz'))
+    // Pick any option to answer; quiz advances to Done
+    await user.click(screen.getByRole('button', { name: /^forsake$/i }))
+    await user.click(screen.getByRole('button', { name: /^done$/i }))
+    // Verify the new RPC was called, and no direct UPDATE happened
+    await waitFor(() => {
+      expect(rpcCalls.value.some(([fn]) => fn === 'save_vocab_retention_answers')).toBe(true)
+    })
+    expect(updateCalls.value.some(p => Object.prototype.hasOwnProperty.call(p, 'vocab_retention_answers'))).toBe(false)
+    Math.random = realRandom
   })
 
   it('fires feedback("correct") on a correct retention answer', async () => {

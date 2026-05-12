@@ -170,7 +170,7 @@ export default function SessionReport() {
 
       const [{ data: p }, { data: qs }, { data: prev }] = await Promise.all([
         supabase.from('profiles').select('grade').eq('id', s?.student_id).single(),
-        supabase.from('questions').select('*').eq('passage_id', s?.passage_id).order('display_order'),
+        supabase.rpc('get_questions_for_session', { p_session_id: sessionId }),
         supabase.from('sessions')
           .select('score_accuracy, score_wpm')
           .eq('passage_id', s?.passage_id)
@@ -318,7 +318,10 @@ export default function SessionReport() {
           async function handleRetentionNext() {
             const isLast = retentionIndex + 1 >= retentionCards.length
             if (isLast) {
-              await supabase.from('sessions').update({ vocab_retention_answers: retentionAnswers }).eq('id', sessionId)
+              await supabase.rpc('save_vocab_retention_answers', {
+                p_session_id: sessionId,
+                p_answers: retentionAnswers,
+              })
               setRetentionDone(true)
             } else {
               setRetentionIndex(retentionIndex + 1)

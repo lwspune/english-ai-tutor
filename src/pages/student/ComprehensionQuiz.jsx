@@ -29,7 +29,7 @@ export default function ComprehensionQuiz() {
       }
 
       const [{ data: qs }, { data: p }] = await Promise.all([
-        supabase.from('questions').select('id, question_text, options, display_order').eq('passage_id', session.passage_id).order('display_order'),
+        supabase.rpc('get_questions_for_session', { p_session_id: sessionId }),
         supabase.from('passages').select('title, content').eq('id', session.passage_id).single(),
       ])
 

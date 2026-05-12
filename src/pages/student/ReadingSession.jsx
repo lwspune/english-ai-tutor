@@ -108,6 +108,12 @@ export default function ReadingSession() {
         className="fixed inset-x-0 bottom-0 z-40 bg-white border-t border-slate-200 shadow-[0_-2px_12px_rgba(0,0,0,0.06)] pb-[env(safe-area-inset-bottom,0)]"
       >
         <div className="max-w-2xl mx-auto px-4 py-3 space-y-2">
+          <p
+            data-testid="retention-indicator"
+            className="text-[10px] text-slate-400 italic text-center"
+          >
+            🎙 Recordings may be kept for teacher review.
+          </p>
           {dailyLimitReached && (
             <p className="text-xs text-center font-medium text-red-500">
               You've reached today's limit of {dailyLimit} passages. Come back tomorrow.

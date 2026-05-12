@@ -178,6 +178,17 @@ describe('ReadingSession — recording indicator', () => {
   })
 })
 
+// ─── Retention indicator ──────────────────────────────────────────────────────
+
+describe('ReadingSession — retention indicator', () => {
+  it('renders the retention indicator inside the recording bar', async () => {
+    render(<ReadingSession />)
+    const indicator = await screen.findByTestId('retention-indicator')
+    expect(indicator).toBeInTheDocument()
+    expect(indicator).toHaveTextContent(/recordings may be kept/i)
+  })
+})
+
 // ─── Sticky bottom recording bar ──────────────────────────────────────────────
 
 describe('ReadingSession — sticky bottom recording bar', () => {

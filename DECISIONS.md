@@ -42,6 +42,16 @@ Keep entries to ~5–10 lines. If a decision needs more rationale, link to a mem
 
 **Revisit trigger:** if <10 unique students have drilled in 30 days, the surface isn't pulling weight — either UX issue or no-stumbles-to-drill content issue. If <60% was-correct rate across students with clean accuracy on the original session, Whisper noise is the culprit and FA migration accelerates.
 
+## 2026-05-12 — Rolling-100 audio retention for research, with offline parent consent + in-app disclosure
+
+**Decision:** Generalise the FA-spike audio retention mechanism (was time-bounded, opt-in via flag) into always-on rolling-100 retention for reading sessions. Teacher takes offline parent consent; intent is research, analysis, and app improvement only. Hard cap at 100 enforced in `claim_retention_slot()` RPC (FIFO eviction). Teacher-only access via new `/teacher/audio-review` page + `retained-audio-url` edge function. Persistent "🎙 Recordings may be kept for teacher review" indicator in the ReadingSession recording bar provides ongoing in-app transparency.
+
+**Context:** User asked whether retaining latest 100 recordings had merit. Initial push-back was about consent + biometric-data-of-minors. User confirmed teacher will take offline consent (overall, not per-student). With consent path defined, the technical case becomes sound — debug scoring disputes, prepare FA-migration validation data, content QA from real audio, drill-noise diagnosis. Migration 028 reuses ~80% of the existing spike retention infrastructure (column, RPC pattern, edge function); cleaner than building parallel. Drill recordings excluded for v1 (very short, very frequent — different shape).
+
+**Watch:** (1) Was the audio actually used for research / analysis / app improvement during the 90-day window? Use proxies: count of `retention_reviewed_status` non-null rows, references in DECISIONS.md or session logs to specific retained recordings. (2) Storage growth — should hover at ≤100 × ~50KB = ~5MB. Anything bigger means eviction isn't working. (3) Any complaints / questions from parents about retention. (4) `retention_reviewed_status` distribution — if all 'no_action' or all null, the surface isn't earning its keep.
+
+**Revisit trigger:** 2026-08-10 (90 days). If usage signal is weak, either narrow the consent purpose ("for scoring dispute review only"), narrow the cap (50), or retire entirely. If usage is meaningful and FA spike revives, evaluate raising the cap to support broader migration validation. Per-student withdrawal-of-consent purge button is deferred but worth adding before scaling beyond one school.
+
 ## 2026-05-12 — Pin ReadingSession recording controls to a sticky bottom bar
 
 **Decision:** Move the Start/Stop/Submit/Re-record controls out of the post-passage card and into a `fixed inset-x-0 bottom-0` bar that's always visible. Add a one-line subdued hint above the passage ("Read aloud — tap Start Recording below when you're ready") shown only when idle.

@@ -148,6 +148,7 @@ export default function TeacherDashboard() {
       <div className="bg-white border-b border-slate-100 px-4 py-2 flex items-center gap-4 flex-wrap">
         <button onClick={() => navigate('/teacher/passages')} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">Manage Passages</button>
         <button onClick={() => navigate('/teacher/completion')} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">Passage Completion</button>
+        <button onClick={() => navigate('/teacher/audio-review')} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">Audio Review</button>
         <div className="h-4 w-px bg-slate-200 mx-1 hidden sm:block" />
         {classCode && (
           <button

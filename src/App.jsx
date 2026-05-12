@@ -14,6 +14,7 @@ import TeacherDashboard from './pages/teacher/TeacherDashboard'
 import PassageManager from './pages/teacher/PassageManager'
 import StudentDetail from './pages/teacher/StudentDetail'
 import PassageCompletion from './pages/teacher/PassageCompletion'
+import AudioReview from './pages/teacher/AudioReview'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 
 function RootRedirect() {
@@ -46,6 +47,7 @@ export default function App() {
           <Route path="/teacher/passages" element={<ProtectedRoute role="teacher"><PassageManager /></ProtectedRoute>} />
           <Route path="/teacher/student/:studentId" element={<ProtectedRoute role="teacher"><StudentDetail /></ProtectedRoute>} />
           <Route path="/teacher/completion" element={<ProtectedRoute role="teacher"><PassageCompletion /></ProtectedRoute>} />
+          <Route path="/teacher/audio-review" element={<ProtectedRoute role="teacher"><AudioReview /></ProtectedRoute>} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

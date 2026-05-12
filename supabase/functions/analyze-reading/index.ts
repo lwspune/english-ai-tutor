@@ -375,11 +375,13 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Spike audio retention: atomically claim a slot for the FA spike sample.
-    // Returns the new count if we won; null otherwise. Auto-disables the flag
-    // when the limit is reached. Safe to call when the flag is off.
-    const { data: spikeSlot } = await supabase.rpc('try_claim_spike_slot')
-    const retainAudio = spikeSlot !== null && spikeSlot !== undefined
+    // Rolling-100 audio retention for research / analysis / app improvement
+    // (teacher has parent consent offline). The RPC decides whether to retain
+    // and which (if any) prior recording to evict via FIFO at cap. Safe to
+    // call when retention is disabled.
+    const { data: claim } = await supabase.rpc('claim_retention_slot')
+    const retainAudio = claim?.retain === true
+    const evictedPath: string | null = claim?.evicted_path ?? null
 
     const { data: session, error: dbError } = await supabase
       .from('sessions')
@@ -398,7 +400,7 @@ Deno.serve(async (req) => {
         whisper_duration_seconds: durationSeconds,
         llm_input_tokens: llmInputTokens,
         llm_output_tokens: llmOutputTokens,
-        spike_audio_path: retainAudio ? audioPath : null,
+        retained_audio_path: retainAudio ? audioPath : null,
       })
       .select()
       .single()
@@ -408,10 +410,15 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: dbError.message }), { status: 500, headers: corsHeaders })
     }
 
+    // Delete the evicted oldest retained audio (if any) from storage.
+    if (evictedPath) {
+      await supabase.storage.from('audio').remove([evictedPath])
+    }
+    // Delete the just-uploaded audio if it's NOT being retained.
     if (!retainAudio) {
       await supabase.storage.from('audio').remove([audioPath])
     } else {
-      console.log(`Spike: retained audio (slot ${spikeSlot}) for session ${session.id}`)
+      console.log(`Retention: kept audio for session ${session.id}`)
     }
 
     // v2.1: bump total_encounters for any vocab words present in the passage.

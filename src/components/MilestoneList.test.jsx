@@ -32,6 +32,12 @@ const WPM_BEST = {
   achieved_at: '2026-05-09T10:00:00Z',
   payload: { score: 165, passage_id: 'p1' },
 }
+const DRILL_ACED = {
+  id: 'm6',
+  kind: 'drill_session_aced',
+  achieved_at: '2026-05-12T10:00:00Z',
+  payload: { count: 3, session_id: 's1' },
+}
 
 describe('MilestoneList', () => {
   it('renders nothing when given an empty list', () => {
@@ -71,6 +77,12 @@ describe('MilestoneList', () => {
     render(<MilestoneList milestones={[COMP_ACED]} />)
     expect(screen.getByText(/comprehension/i)).toBeInTheDocument()
     expect(screen.getByText(/100%/)).toBeInTheDocument()
+  })
+
+  it('shows label for drill_session_aced with the count', () => {
+    render(<MilestoneList milestones={[DRILL_ACED]} />)
+    expect(screen.getByText(/drill aced/i)).toBeInTheDocument()
+    expect(screen.getByText(/3/)).toBeInTheDocument()
   })
 
   it('renders each item with its date', () => {

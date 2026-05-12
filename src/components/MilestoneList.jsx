@@ -6,6 +6,7 @@ const ICONS = {
   personal_best_wpm: '⚡',
   comprehension_aced: '📘',
   word_mastered: '⭐',
+  drill_session_aced: '💪',
 }
 
 function labelFor(m) {
@@ -23,6 +24,8 @@ function labelFor(m) {
       return `Comprehension aced — ${p.score}%`
     case 'word_mastered':
       return `Mastered "${p.word ?? '…'}"`
+    case 'drill_session_aced':
+      return `Drill aced — ${p.count ?? 3} stumble words`
     default:
       return m.kind
   }

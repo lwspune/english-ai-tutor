@@ -61,6 +61,8 @@ Use the **Add Student** button on the teacher dashboard (single or CSV bulk). It
 
 For emergency SQL inserts (rare): use `auth.users` directly with `crypt(password, gen_salt('bf'))` and `raw_user_meta_data: { full_name, role: 'student', grade }`. Do NOT use the Supabase dashboard UI — it doesn't set `raw_user_meta_data`, so the trigger ends up with role `student` and no grade.
 
+**Critical:** also set `email_change`, `email_change_token_new`, `recovery_token`, `confirmation_token`, `phone_change`, `phone_change_token`, `reauthentication_token` to `''` (empty string, NOT NULL). GoTrue's admin endpoint scans these columns as strings; a NULL on any of them makes `auth.admin.listUsers()` fail with `500 "Database error finding users: Scan error on column ... converting NULL to string is unsupported"`. That break is silent for normal user flows but fatal for `send-reminders` and any other function that lists users. Bit us on 2026-05-12; one row created via emergency SQL on 2026-05-01 left these NULL and broke the daily cron for ~11 days.
+
 ## Class code
 
 Set once by migration as a random 6-char hex code (in `app_settings`). Teacher shares it with students for self-registration. To change it:
@@ -71,9 +73,16 @@ update app_settings set class_code = 'NEWCODE' where id = true;
 
 ## Resend (welcome / activation / re-engagement emails)
 
-Sender `tutor@lwspune.in`. The domain must be verified on resend.com/domains (SPF + DKIM + return-path DNS records) or Resend returns `403 "domain not verified"`. The `create-student` edge function wraps `sendWelcomeEmail` in `Promise.allSettled`, so failures are logged but never surfaced — user creation looks successful but no email goes out. Verification status is currently pending; see `memory/project_pending_resend.md`.
+Sender `tutor@lwspune.in`. The domain must be verified on resend.com/domains (SPF + DKIM + return-path DNS records) or Resend returns `403 "domain not verified"`. The `create-student` edge function wraps `sendWelcomeEmail` in `Promise.allSettled`, so failures are logged but never surfaced — user creation looks successful but no email goes out. Verified on 2026-05-13 (DNS records in Hostinger; SPF + MX at `send`, DKIM at `resend._domainkey`).
 
-API key: stored as `RESEND_API_KEY` in Supabase dashboard → Edge Functions → Secrets. Send-only restricted. Used by `create-student` and `send-reminders`.
+API key: stored as `RESEND_API_KEY` in Supabase dashboard → Edge Functions → Secrets. Send-only restricted. Used by `create-student` and `send-reminders`. **Rate limit: 2 requests/sec on free tier** — `send-reminders` runs sequentially in a tight loop and can hit it on first daily cron firings with >5 candidates. Workaround: re-fire 2–3 times; each retry only hits the previously-failed students (function only marks `last_reminder_sent` on success). Long-term fix: add a 600ms sleep between iterations in the loop.
+
+DNS records (live, for reference):
+- `resend._domainkey` TXT — DKIM public key (`p=MIGfMA0GCSqG...IDAQAB`)
+- `send` MX 10 → `feedback-smtp.ap-northeast-1.amazonses.com` (Tokyo region)
+- `send` TXT → `v=spf1 include:amazonses.com ~all`
+
+DNS edits happen in Hostinger → Websites → `lwspune.in` → Advanced → DNS Zone Editor (NOT in Hostinger Domain Portfolio — that section only shows domains registered with Hostinger, and `lwspune.in` is registered at GoDaddy but DNS-pointed at Hostinger).
 
 ## Production quirks that have bitten us
 

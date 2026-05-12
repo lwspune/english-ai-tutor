@@ -34,12 +34,27 @@ except ImportError:
 MODEL_NAME = "facebook/wav2vec2-base-960h"
 TARGET_SR = 16_000
 PAUSE_THRESHOLD = 0.4
-WORD_CONFIDENCE_THRESHOLD = 0.30
+CONTENT_THRESHOLD = 0.20
+FUNCTION_THRESHOLD = 0.10
+FUNCTION_WORDS = frozenset({
+    "a", "an", "the",
+    "is", "am", "are", "was", "were", "be", "been", "being",
+    "do", "did", "does", "has", "have", "had",
+    "to", "of", "in", "on", "at", "by", "for", "with", "as", "from",
+    "and", "or", "but", "so", "if", "than", "that",
+    "i", "we", "you", "he", "she", "it", "they", "me", "us", "them",
+    "my", "his", "her", "our", "their", "your",
+})
+ENGINE_VERSION = "fa-spike-v2"
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 def normalize_word(w: str) -> str:
     return re.sub(r"[^a-z]", "", w.lower())
+
+
+def threshold_for(word: str) -> float:
+    return FUNCTION_THRESHOLD if normalize_word(word) in FUNCTION_WORDS else CONTENT_THRESHOLD
 
 
 def decode_to_pcm(audio_path: str) -> np.ndarray:
@@ -107,7 +122,8 @@ def run_forced_alignment(audio_path: str, expected_text: str) -> dict:
     waveform = decode_to_pcm(audio_path)
     duration_s = len(waveform) / TARGET_SR
 
-    words = [w for w in re.split(r"\s+", expected_text.strip()) if w]
+    raw_words = [w for w in re.split(r"\s+", expected_text.strip()) if w]
+    words = [w for w in raw_words if normalize_word(w)]
     token_ids, word_ranges = build_targets(words, processor)
 
     inputs = processor(waveform, sampling_rate=TARGET_SR, return_tensors="pt", padding=True)
@@ -139,12 +155,14 @@ def run_forced_alignment(audio_path: str, expected_text: str) -> dict:
                 "accent_tolerated": False,
             })
             continue
-        status = "correct" if avg >= WORD_CONFIDENCE_THRESHOLD else "substitution"
+        threshold = threshold_for(words[i])
+        status = "correct" if avg >= threshold else "substitution"
         word_results.append({
             "word": words[i],
             "spoken": words[i] if status == "correct" else "(low_conf)",
             "status": status,
             "score": round(avg, 3),
+            "threshold": threshold,
             "start": round(frame_start * frame_dur, 2),
             "end": round(frame_end * frame_dur, 2),
             "accent_tolerated": False,
@@ -170,7 +188,7 @@ def run_forced_alignment(audio_path: str, expected_text: str) -> dict:
     score_wpm = round((len(words) / duration_s) * 60) if duration_s > 0 else 0
 
     return {
-        "engine_version": "fa-spike-v1",
+        "engine_version": ENGINE_VERSION,
         "model": MODEL_NAME,
         "duration_seconds": round(duration_s, 2),
         "score_accuracy": score_accuracy,

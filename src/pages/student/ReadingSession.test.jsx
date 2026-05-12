@@ -39,8 +39,10 @@ const PASSAGE = {
   grade_level: 10,
 }
 
-const { mockCounts } = vi.hoisted(() => ({
+const { mockCounts, mockInvoke, mockUpload } = vi.hoisted(() => ({
   mockCounts: { attempt: 0, today: 0, dailyLimit: 5 },
+  mockInvoke: vi.fn(),
+  mockUpload: vi.fn(),
 }))
 
 vi.mock('../../lib/supabase', () => ({
@@ -73,8 +75,8 @@ vi.mock('../../lib/supabase', () => ({
       }
       return {}
     },
-    storage: { from: () => ({ upload: vi.fn() }) },
-    functions: { invoke: vi.fn() },
+    storage: { from: () => ({ upload: (...args) => mockUpload(...args) }) },
+    functions: { invoke: (...args) => mockInvoke(...args) },
   },
 }))
 
@@ -88,6 +90,10 @@ beforeEach(() => {
   mockRecorderState.autoStopped = false
   mockRecorderState.remaining = 180
   mockFeedback.mockClear()
+  mockInvoke.mockReset()
+  mockInvoke.mockResolvedValue({ data: { sessionId: 'new-session-id' }, error: null })
+  mockUpload.mockReset()
+  mockUpload.mockResolvedValue({ data: { path: 'student-1/abc.webm' }, error: null })
 })
 
 // ─── Daily limit ──────────────────────────────────────────────────────────────
@@ -169,5 +175,25 @@ describe('ReadingSession — recording indicator', () => {
     await waitFor(() => screen.getByRole('button', { name: /stop recording/i }))
     fireEvent.click(screen.getByRole('button', { name: /stop recording/i }))
     expect(mockFeedback).toHaveBeenCalledWith('tap')
+  })
+})
+
+// ─── Identity hardening (Finding 3) ───────────────────────────────────────────
+
+describe('ReadingSession — invoke body shape (Finding 3)', () => {
+  it('does NOT include studentId / passageText / grade — those are derived server-side from the JWT', async () => {
+    mockRecorderState.audioBlob = new Blob(['fake audio'], { type: 'audio/webm' })
+    render(<ReadingSession />)
+    await waitFor(() => screen.getByRole('button', { name: /submit/i }))
+    fireEvent.click(screen.getByRole('button', { name: /submit/i }))
+    await waitFor(() => expect(mockInvoke).toHaveBeenCalled())
+    const [fnName, opts] = mockInvoke.mock.calls[0]
+    expect(fnName).toBe('analyze-reading')
+    expect(opts.body).not.toHaveProperty('studentId')
+    expect(opts.body).not.toHaveProperty('passageText')
+    expect(opts.body).not.toHaveProperty('grade')
+    expect(opts.body).toHaveProperty('audioPath')
+    expect(opts.body).toHaveProperty('passageId')
+    expect(opts.body).toHaveProperty('aiFeedbackEnabled')
   })
 })

@@ -196,13 +196,60 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
-    const { audioPath, passageText, studentId, passageId, grade, aiFeedbackEnabled } = await req.json()
-    console.log('Starting analysis:', { audioPath, studentId, passageId, grade, aiFeedbackEnabled })
+    // Identity hardening (security-review Finding 3): derive caller identity
+    // from the JWT instead of trusting client-supplied fields. We deploy with
+    // verify_jwt: false so Supabase doesn't pre-validate; we validate
+    // explicitly via supabase.auth.getUser(token).
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { status: 401, headers: corsHeaders },
+      )
+    }
+    const token = authHeader.slice(7)
+
+    const { audioPath, passageId, aiFeedbackEnabled } = await req.json()
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     )
+
+    const { data: { user }, error: authErr } = await supabase.auth.getUser(token)
+    if (authErr || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid token' }),
+        { status: 401, headers: corsHeaders },
+      )
+    }
+    const studentId = user.id
+
+    // Fetch passage content + student's grade server-side. These were
+    // previously trusted from the request body; now derived from passageId
+    // and the JWT-validated studentId.
+    const [{ data: passage, error: pErr }, { data: profile }] = await Promise.all([
+      supabase.from('passages').select('content, grade_level').eq('id', passageId).single(),
+      supabase.from('profiles').select('grade').eq('id', studentId).single(),
+    ])
+    if (pErr || !passage) {
+      return new Response(
+        JSON.stringify({ error: 'Passage not found' }),
+        { status: 404, headers: corsHeaders },
+      )
+    }
+    // Enforce grade gating that the passages RLS policy applies to client reads.
+    // Service-role bypasses RLS, so we re-check here. null grade_level = all grades.
+    if (passage.grade_level !== null && passage.grade_level !== profile?.grade) {
+      return new Response(
+        JSON.stringify({ error: 'Passage not accessible for your grade' }),
+        { status: 403, headers: corsHeaders },
+      )
+    }
+    const passageText = passage.content
+    const grade = profile?.grade ?? '10'
+
+    console.log('Starting analysis:', { audioPath, studentId, passageId, grade, aiFeedbackEnabled })
 
     // Guardrail 1: max 3 attempts per passage per student
     const { count: attemptCount } = await supabase

@@ -57,7 +57,7 @@ export default function ReadingSession() {
       if (uploadError) throw uploadError
 
       const { data, error: fnError } = await supabase.functions.invoke('analyze-reading', {
-        body: { audioPath: filename, passageText: passage.content, studentId: profile.id, passageId, grade: profile.grade, aiFeedbackEnabled },
+        body: { audioPath: filename, passageId, aiFeedbackEnabled },
       })
       if (fnError) {
         throw new Error(await extractEdgeFunctionError(fnError))

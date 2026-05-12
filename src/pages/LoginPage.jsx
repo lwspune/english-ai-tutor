@@ -72,7 +72,7 @@ export default function LoginPage() {
       email: signupEmail,
       password: signupPassword,
       options: {
-        data: { full_name: name.trim(), role: 'student', grade },
+        data: { full_name: name.trim(), role: 'student', grade: grade || null },
       },
     })
 
@@ -249,14 +249,16 @@ export default function LoginPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Grade</label>
+              <label htmlFor="signup-grade" className="block text-sm font-medium text-slate-700 mb-1">
+                Grade <span className="text-slate-400 font-normal">(optional)</span>
+              </label>
               <select
+                id="signup-grade"
                 value={grade}
                 onChange={e => setGrade(e.target.value)}
-                required
                 className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
               >
-                <option value="">Select grade</option>
+                <option value="">Prefer not to say</option>
                 {[9, 10, 11, 12].map(g => (
                   <option key={g} value={g}>Grade {g}</option>
                 ))}

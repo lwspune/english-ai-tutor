@@ -48,21 +48,23 @@ beforeEach(() => {
   mockNavigate.mockReset()
 })
 
-describe('VocabHome — grade gating', () => {
-  it('shows locked state for grade 9', async () => {
+describe('VocabHome — ungated across grades', () => {
+  it('shows practice UI for grade 9', async () => {
     mockProfile.value = { id: 's1', grade: '9' }
     render(<VocabHome />)
     await waitFor(() => {
-      expect(screen.getByText(/unlocks in grade 11/i)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /start practice/i })).toBeInTheDocument()
     })
+    expect(screen.queryByText(/unlocks in grade 11/i)).not.toBeInTheDocument()
   })
 
-  it('shows locked state for grade 10', async () => {
+  it('shows practice UI for grade 10', async () => {
     mockProfile.value = { id: 's1', grade: '10' }
     render(<VocabHome />)
     await waitFor(() => {
-      expect(screen.getByText(/unlocks in grade 11/i)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /start practice/i })).toBeInTheDocument()
     })
+    expect(screen.queryByText(/unlocks in grade 11/i)).not.toBeInTheDocument()
   })
 
   it('shows practice UI for grade 11', async () => {
@@ -83,6 +85,14 @@ describe('VocabHome — grade gating', () => {
 
   it('shows practice UI for MBA', async () => {
     mockProfile.value = { id: 's1', grade: 'MBA' }
+    render(<VocabHome />)
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /start practice/i })).toBeInTheDocument()
+    })
+  })
+
+  it('shows practice UI when grade is null', async () => {
+    mockProfile.value = { id: 's1', grade: null }
     render(<VocabHome />)
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /start practice/i })).toBeInTheDocument()

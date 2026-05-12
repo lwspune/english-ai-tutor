@@ -286,12 +286,18 @@ describe('SessionReport — vocab highlight', () => {
     example_sentence: 'They travelled around the world.',
   }
 
-  it('does not highlight vocab words for grade 10 (gated)', async () => {
+  it('highlights vocab words for grade 10 students (ungated)', async () => {
     profileRef.data = { grade: '10' }
     vocabRef.data = [VOCAB]
     render(<SessionReport />)
-    await waitFor(() => screen.getByText('Hello'))
-    expect(screen.queryByTestId('vocab-word-world')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.getByTestId('vocab-word-world')).toBeInTheDocument())
+  })
+
+  it('highlights vocab words for grade 9 students (ungated)', async () => {
+    profileRef.data = { grade: '9' }
+    vocabRef.data = [VOCAB]
+    render(<SessionReport />)
+    await waitFor(() => expect(screen.getByTestId('vocab-word-world')).toBeInTheDocument())
   })
 
   it('highlights matching vocab words for grade 11 students', async () => {
@@ -366,13 +372,12 @@ describe('SessionReport — vocab retention quiz', () => {
     synonyms: ['quick', 'lively'], antonyms: ['slow', 'sluggish'],
   }
 
-  it('is hidden for grade 9/10 students', async () => {
+  it('renders for grade 9/10 students too (ungated)', async () => {
     profileRef.data = { grade: '10' }
-    vocabRef.data = [ABANDON]
+    vocabRef.data = [ABANDON, BRISK]
     sessionRef.data = { ...BASE_SESSION, word_results: [{ word: 'Abandon', status: 'correct' }] }
     render(<SessionReport />)
-    await waitFor(() => screen.getByText('Abandon'))
-    expect(screen.queryByTestId('retention-quiz')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.getByTestId('retention-quiz')).toBeInTheDocument())
   })
 
   it('is hidden when no vocab words match the passage', async () => {

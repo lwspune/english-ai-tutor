@@ -238,14 +238,9 @@ Deno.serve(async (req) => {
         { status: 404, headers: corsHeaders },
       )
     }
-    // Enforce grade gating that the passages RLS policy applies to client reads.
-    // Service-role bypasses RLS, so we re-check here. null grade_level = all grades.
-    if (passage.grade_level !== null && passage.grade_level !== profile?.grade) {
-      return new Response(
-        JSON.stringify({ error: 'Passage not accessible for your grade' }),
-        { status: 403, headers: corsHeaders },
-      )
-    }
+    // Grade gating was removed (migration 029) — all authenticated students may
+    // read any passage. `profile.grade` is still consulted below for the
+    // WPM target only. `passage.grade_level` is a label now, not a gate.
     const passageText = passage.content
     const grade = profile?.grade ?? '10'
 

@@ -47,9 +47,19 @@ describe('BottomNav', () => {
     expect(screen.getByRole('link', { name: /home/i })).not.toHaveAttribute('aria-current')
   })
 
+  it('shows Vocab tab for grade 9 students', () => {
+    renderAt('/student', '9')
+    expect(screen.getByRole('link', { name: /vocab/i })).toHaveAttribute('href', '/student/vocab')
+  })
+
+  it('shows Vocab tab for grade 10 students', () => {
+    renderAt('/student', '10')
+    expect(screen.getByRole('link', { name: /vocab/i })).toBeInTheDocument()
+  })
+
   it('shows Vocab tab for grade 11 students', () => {
     renderAt('/student', '11')
-    expect(screen.getByRole('link', { name: /vocab/i })).toHaveAttribute('href', '/student/vocab')
+    expect(screen.getByRole('link', { name: /vocab/i })).toBeInTheDocument()
   })
 
   it('shows Vocab tab for grade 12 students', () => {
@@ -62,14 +72,9 @@ describe('BottomNav', () => {
     expect(screen.getByRole('link', { name: /vocab/i })).toBeInTheDocument()
   })
 
-  it('hides Vocab tab for grade 9 students', () => {
-    renderAt('/student', '9')
-    expect(screen.queryByRole('link', { name: /vocab/i })).not.toBeInTheDocument()
-  })
-
-  it('hides Vocab tab for grade 10 students', () => {
-    renderAt('/student', '10')
-    expect(screen.queryByRole('link', { name: /vocab/i })).not.toBeInTheDocument()
+  it('shows Vocab tab even when grade is missing', () => {
+    renderAt('/student', null)
+    expect(screen.getByRole('link', { name: /vocab/i })).toBeInTheDocument()
   })
 
   it('marks Vocab as current on /student/vocab', () => {

@@ -56,7 +56,7 @@ export default function StudentHome() {
   useEffect(() => {
     async function load() {
       const [{ data: p }, { data: s }, { data: settings }] = await Promise.all([
-        supabase.from('passages').select('*').or(`grade_level.eq.${profile.grade},grade_level.is.null`).order('created_at', { ascending: false }),
+        supabase.from('passages').select('*').order('created_at', { ascending: false }),
         supabase.from('sessions').select('*, passages(title)').eq('student_id', profile.id).order('created_at', { ascending: false }),
         supabase.from('app_settings').select('daily_session_limit').single(),
       ])

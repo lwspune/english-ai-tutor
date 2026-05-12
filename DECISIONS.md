@@ -22,6 +22,16 @@ Keep entries to ~5–10 lines. If a decision needs more rationale, link to a mem
 
 ---
 
+## 2026-05-12 — Stop gating on grade; keep the field as a label
+
+**Decision:** Remove grade as an access gate everywhere. Migration 029 drops the `students read grade passages` RLS policy and replaces it with `read passages using (true)`. analyze-reading drops its 403 grade-mismatch check. StudentHome drops the `.or(grade_level.eq.X)` filter. BottomNav / VocabHome / VocabPractice / SessionReport drop the `VOCAB_GRADES = {'11','12','MBA'}` set so vocab is available to every student. TeacherDashboard's vocab-mastery stat drops the `['11','12','MBA']` student filter and becomes class-wide. Signup grade becomes optional ("Prefer not to say" → null). `profiles.grade` and `passages.grade_level` stay on the schema as labels; `WPM_TARGETS` still consults grade per-student (falls back to 150 when null).
+
+**Context:** Grade was doing two jobs poorly conflated — content gating (vocab unlocks at 11 for NDA prep) and difficulty matching (passages tagged by grade). The second job is already done better by `passages.difficulty`. The 80% mastery gate is the real floor against false progress, so a grade-9 attempting an MBA passage gets ~50%, doesn't mark complete, and creates no data integrity problem. User considered an opt-in NDA flag as a vocab gate replacement and rejected (a) fully-open over (b) opt-in-flag; the strictest read of "stop gating" with the trade-off accepted that grade-9/10 vocab engagement may suffer.
+
+**Watch:** (1) Vocab-mastery rate for sub-11 students over the next 30 days. If grade-9/10 students show seen-but-not-mastered stalls or abandon mid-deck after a card or two, the NDA-prep deck is wrong for them. (2) Class-avg accuracy on TeacherDashboard — if it drops noticeably, students are attempting passages way over their level (acceptable but worth knowing). (3) Teacher feedback — "why is X reading the MBA passage" moments. (4) Whether any sub-11 student returns to vocab on a second day vs bouncing.
+
+**Revisit trigger:** if vocab-mastery delta on grade 9/10 (after 30 days, ≥5 such students with ≥3 deck sessions) is materially worse than grade 11+, revisit by introducing an opt-in `profiles.is_competitive_prep boolean` flag at signup that gates vocab content. Or earlier: ≥3 sub-11 students report the vocab feels "too hard" / "all weird words" in any channel.
+
 ## 2026-05-12 — Park Phase 1 forced-alignment migration
 
 **Decision:** Don't migrate `analyze-reading` (and now `analyze-drill`) from Whisper to CTC forced alignment yet, despite the spike calibrating green on 4/6 sessions. Revive when a feature that *needs* honest scoring is ready to ship.

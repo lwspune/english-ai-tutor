@@ -65,6 +65,18 @@ vi.mock('../../lib/supabase', () => ({
           }),
         }
       }
+      if (table === 'vocabulary_words') {
+        return {
+          select: () => Promise.resolve({ count: 10, error: null }),
+        }
+      }
+      if (table === 'student_word_progress') {
+        return {
+          select: () => ({
+            in: () => Promise.resolve({ data: [], error: null }),
+          }),
+        }
+      }
       return {}
     },
   },
@@ -184,11 +196,12 @@ describe('TeacherDashboard — summary stat chips', () => {
     expect(chip).toHaveTextContent(/avg accuracy/i)
   })
 
-  it('shows vocab mastery chip ("—" when no grade 11+ students)', async () => {
+  it('shows class-wide vocab mastery chip (now ungated by grade)', async () => {
     render(<TeacherDashboard />)
     await waitFor(() => screen.getByText('Aarav Shah'))
     const chip = screen.getByTestId('stat-vocab')
-    expect(chip).toHaveTextContent('—')
+    // grade-10 student is now eligible. 0 mastered of 10 total → 0%.
+    expect(chip).toHaveTextContent('0%')
     expect(chip).toHaveTextContent(/vocab mastery/i)
   })
 })

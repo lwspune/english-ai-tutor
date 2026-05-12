@@ -5,14 +5,11 @@ import { useAuth } from '../../lib/AuthContext'
 import BottomNav from '../../components/BottomNav'
 import { isDueForMaintenance } from '../../lib/srs'
 
-const VOCAB_GRADES = new Set(['11', '12', 'MBA'])
-
 export default function VocabHome() {
   const { profile } = useAuth()
   const navigate = useNavigate()
-  const allowed = VOCAB_GRADES.has(String(profile.grade))
 
-  const [loading, setLoading] = useState(allowed)
+  const [loading, setLoading] = useState(true)
   const [total, setTotal] = useState(0)
   const [mastered, setMastered] = useState(0)
   const [due, setDue] = useState(0)
@@ -21,7 +18,6 @@ export default function VocabHome() {
   const [seenFromReading, setSeenFromReading] = useState(0)
 
   useEffect(() => {
-    if (!allowed) return
     async function load() {
       const { count: totalCount } = await supabase
         .from('vocabulary_words')
@@ -51,7 +47,7 @@ export default function VocabHome() {
       setLoading(false)
     }
     load()
-  }, [profile.id, allowed])
+  }, [profile.id])
 
   const newAvailable = Math.max(0, total - seen)
   const canPractice = due > 0 || newAvailable > 0
@@ -72,12 +68,7 @@ export default function VocabHome() {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-4">
-        {!allowed ? (
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 text-center">
-            <p className="text-sm text-slate-600">Vocabulary practice unlocks in grade 11.</p>
-            <p className="text-xs text-slate-400 mt-2">Keep building your reading skills in the meantime.</p>
-          </div>
-        ) : loading ? (
+        {loading ? (
           <p className="text-sm text-slate-400">Loading...</p>
         ) : (
           <>

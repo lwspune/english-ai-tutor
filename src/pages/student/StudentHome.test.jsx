@@ -75,10 +75,13 @@ vi.mock('../../lib/supabase', () => {
         if (table === 'passages') {
           return {
             select: () => ({
+              // After grade gating was removed, StudentHome calls .order() directly
+              // with no .or() filter. Keep the .or branch around to detect regression.
               or: (filter) => {
                 mockPassagesOr(filter)
                 return makeOrder(passagesRef)
               },
+              order: () => Promise.resolve({ data: passagesRef.data }),
             }),
           }
         }
@@ -273,19 +276,22 @@ describe('StudentHome — difficulty ordering', () => {
   })
 })
 
-// ─── Grade filter ─────────────────────────────────────────────────────────────
+// ─── Grade filter removed (ungated) ───────────────────────────────────────────
 
-describe('StudentHome — grade filter', () => {
-  it('queries passages with a grade filter matching the student grade', async () => {
+describe('StudentHome — passages query is not gated by grade', () => {
+  it('does NOT apply a grade-level filter to the passages query', async () => {
     render(<StudentHome />)
-    await waitFor(() => expect(mockPassagesOr).toHaveBeenCalled())
-    expect(mockPassagesOr).toHaveBeenCalledWith('grade_level.eq.10,grade_level.is.null')
+    await waitFor(() => screen.getByText('Grade 10 Passage'))
+    expect(mockPassagesOr).not.toHaveBeenCalled()
   })
 
-  it('shows passages returned for the student grade', async () => {
+  it('shows passages of all grade levels', async () => {
+    const GRADE_12 = { id: 'p12', title: 'Grade 12 Passage', word_count: 100, grade_level: '12', difficulty: 'hard' }
+    passagesRef.data = [GRADE_10_PASSAGE, ALL_GRADES_PASSAGE, GRADE_12]
     render(<StudentHome />)
     await waitFor(() => screen.getByText('Grade 10 Passage'))
     expect(screen.getByText('All Grades Passage')).toBeInTheDocument()
+    expect(screen.getByText('Grade 12 Passage')).toBeInTheDocument()
   })
 })
 

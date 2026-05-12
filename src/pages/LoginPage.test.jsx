@@ -13,17 +13,19 @@ vi.mock('../lib/AuthContext', () => ({
   useAuth: () => ({ signIn: vi.fn().mockResolvedValue({ error: null }) }),
 }))
 
-const { mockResetPasswordForEmail } = vi.hoisted(() => ({
+const { mockResetPasswordForEmail, mockSignUp, mockRpc } = vi.hoisted(() => ({
   mockResetPasswordForEmail: vi.fn(),
+  mockSignUp: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
+  mockRpc: vi.fn().mockResolvedValue({ data: true }),
 }))
 
 vi.mock('../lib/supabase', () => ({
   supabase: {
     auth: {
       resetPasswordForEmail: mockResetPasswordForEmail,
+      signUp: mockSignUp,
     },
-    rpc: vi.fn().mockResolvedValue({ data: true }),
-    signUp: vi.fn(),
+    rpc: mockRpc,
   },
 }))
 
@@ -68,6 +70,43 @@ describe('LoginPage — tagline and onboarding context', () => {
     expect(screen.getByText(/pick a passage/i)).toBeInTheDocument()
     expect(screen.getByText(/read it aloud/i)).toBeInTheDocument()
     expect(screen.getByText(/instant feedback/i)).toBeInTheDocument()
+  })
+})
+
+describe('LoginPage — signup grade is optional', () => {
+  function fillSignupAndSubmit({ grade } = {}) {
+    fireEvent.click(screen.getByRole('button', { name: /sign up/i }))
+    fireEvent.change(screen.getByPlaceholderText(/aarav shah/i), { target: { value: 'Test Student' } })
+    fireEvent.change(screen.getByPlaceholderText(/you@school\.com/i), { target: { value: 'student@test.com' } })
+    fireEvent.change(screen.getByPlaceholderText(/at least 6 characters/i), { target: { value: 'pw123456' } })
+    if (grade) {
+      fireEvent.change(screen.getByLabelText(/grade/i), { target: { value: grade } })
+    }
+    fireEvent.change(screen.getByPlaceholderText(/ask your teacher/i), { target: { value: 'ABC123' } })
+    fireEvent.click(screen.getByRole('button', { name: /create account/i }))
+  }
+
+  it('creates an account when grade is left unselected', async () => {
+    renderPage()
+    fillSignupAndSubmit()
+    await waitFor(() => expect(mockSignUp).toHaveBeenCalled())
+    const callArg = mockSignUp.mock.calls[0][0]
+    expect(callArg.options.data.grade).toBeNull()
+  })
+
+  it('passes the selected grade through to signUp when chosen', async () => {
+    renderPage()
+    fillSignupAndSubmit({ grade: '11' })
+    await waitFor(() => expect(mockSignUp).toHaveBeenCalled())
+    const callArg = mockSignUp.mock.calls[0][0]
+    expect(callArg.options.data.grade).toBe('11')
+  })
+
+  it('grade dropdown is not required', () => {
+    renderPage()
+    fireEvent.click(screen.getByRole('button', { name: /sign up/i }))
+    const select = screen.getByLabelText(/grade/i)
+    expect(select).not.toBeRequired()
   })
 })
 

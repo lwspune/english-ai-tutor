@@ -1,7 +1,4 @@
 import { Link, useLocation } from 'react-router-dom'
-import { useAuth } from '../lib/AuthContext'
-
-const VOCAB_GRADES = new Set(['11', '12', 'MBA'])
 
 function HomeIcon() {
   return (
@@ -47,22 +44,18 @@ function NavItem({ to, label, icon, active }) {
 
 export default function BottomNav() {
   const { pathname } = useLocation()
-  const { profile } = useAuth()
-  const showVocab = profile && VOCAB_GRADES.has(String(profile.grade))
   return (
     <nav
       className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex z-40"
       aria-label="Main navigation"
     >
       <NavItem to="/student" label="Home" icon={<HomeIcon />} active={pathname === '/student'} />
-      {showVocab && (
-        <NavItem
-          to="/student/vocab"
-          label="Vocab"
-          icon={<BookIcon />}
-          active={pathname.startsWith('/student/vocab')}
-        />
-      )}
+      <NavItem
+        to="/student/vocab"
+        label="Vocab"
+        icon={<BookIcon />}
+        active={pathname.startsWith('/student/vocab')}
+      />
       <NavItem to="/student/progress" label="Progress" icon={<ChartIcon />} active={pathname === '/student/progress'} />
     </nav>
   )

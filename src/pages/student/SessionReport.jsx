@@ -10,7 +10,6 @@ import { feedback } from '../../lib/feedback'
 import { awardMilestone } from '../../lib/milestones'
 import { selectStumbleWords } from '../../lib/stumbleWords'
 
-const VOCAB_GRADES = new Set(['11', '12', 'MBA'])
 const normalizeWord = (s) => s.toLowerCase().replace(/^[^a-z-]+|[^a-z-]+$/g, '')
 
 function VocabSheet({ vocab, onClose }) {
@@ -212,18 +211,16 @@ export default function SessionReport() {
         })
       }
 
-      if (VOCAB_GRADES.has(String(p?.grade))) {
-        const [{ data: vocab }, { data: progress }] = await Promise.all([
-          supabase.from('vocabulary_words').select('id, word, part_of_speech, definition, example_sentence, audio_path, synonyms, antonyms'),
-          supabase.from('student_word_progress').select('word_id, mastered_at').eq('student_id', s.student_id),
-        ])
-        const map = new Map()
-        for (const v of vocab ?? []) map.set(v.word.toLowerCase(), v)
-        setVocabMap(map)
-        if (!s.vocab_retention_answers) {
-          const cards = buildRetentionQuiz(s.word_results ?? [], map, progress ?? [], vocab ?? [])
-          setRetentionCards(cards)
-        }
+      const [{ data: vocab }, { data: progress }] = await Promise.all([
+        supabase.from('vocabulary_words').select('id, word, part_of_speech, definition, example_sentence, audio_path, synonyms, antonyms'),
+        supabase.from('student_word_progress').select('word_id, mastered_at').eq('student_id', s.student_id),
+      ])
+      const map = new Map()
+      for (const v of vocab ?? []) map.set(v.word.toLowerCase(), v)
+      setVocabMap(map)
+      if (!s.vocab_retention_answers) {
+        const cards = buildRetentionQuiz(s.word_results ?? [], map, progress ?? [], vocab ?? [])
+        setRetentionCards(cards)
       }
     }
     load()

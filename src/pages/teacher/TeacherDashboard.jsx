@@ -106,7 +106,7 @@ export default function TeacherDashboard() {
 
   useEffect(() => {
     async function loadVocabStats() {
-      const eligibleIds = students.filter(s => ['11', '12', 'MBA'].includes(String(s.grade))).map(s => s.id)
+      const eligibleIds = students.map(s => s.id)
       if (!eligibleIds.length) {
         setClassVocabMastery(null)
         return

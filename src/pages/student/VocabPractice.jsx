@@ -11,8 +11,6 @@ import { feedback } from '../../lib/feedback'
 import { awardMilestone } from '../../lib/milestones'
 import { MAX_BOX, MASTERY_CORRECT_THRESHOLD } from '../../lib/srs'
 
-const VOCAB_GRADES = new Set(['11', '12', 'MBA'])
-
 export default function VocabPractice() {
   const { profile } = useAuth()
   const navigate = useNavigate()
@@ -26,10 +24,6 @@ export default function VocabPractice() {
   const [masteryBurst, setMasteryBurst] = useState(false)
 
   useEffect(() => {
-    if (!VOCAB_GRADES.has(String(profile.grade))) {
-      navigate('/student/vocab', { replace: true })
-      return
-    }
     async function load() {
       const { data: allWords } = await supabase.from('vocabulary_words').select('*')
       const { data: progress } = await supabase
@@ -46,7 +40,7 @@ export default function VocabPractice() {
       setLoading(false)
     }
     load()
-  }, [profile.id, profile.grade, navigate])
+  }, [profile.id])
 
   function wouldMasterOnCorrect(wordId) {
     const before = progressMap.get(wordId)

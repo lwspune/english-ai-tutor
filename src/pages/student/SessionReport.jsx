@@ -4,9 +4,11 @@ import { supabase } from '../../lib/supabase'
 import { WPM_TARGETS } from '../../lib/wpmTargets'
 import AudioPlayButton from '../../components/AudioPlayButton'
 import Confetti from '../../components/Confetti'
+import StumbleDrillCard from '../../components/StumbleDrillCard'
 import { buildRetentionQuiz } from '../../lib/vocabRetentionQuiz'
 import { feedback } from '../../lib/feedback'
 import { awardMilestone } from '../../lib/milestones'
+import { selectStumbleWords } from '../../lib/stumbleWords'
 
 const VOCAB_GRADES = new Set(['11', '12', 'MBA'])
 const normalizeWord = (s) => s.toLowerCase().replace(/^[^a-z-]+|[^a-z-]+$/g, '')
@@ -157,6 +159,8 @@ export default function SessionReport() {
   const [retentionAnswers, setRetentionAnswers] = useState([])
   const [retentionSkipped, setRetentionSkipped] = useState(false)
   const [retentionDone, setRetentionDone] = useState(false)
+  const [stumbleWords, setStumbleWords] = useState([])
+  const [drillAceCount, setDrillAceCount] = useState(0)
   const celebratedRef = useRef(false)
 
   useEffect(() => {
@@ -168,7 +172,7 @@ export default function SessionReport() {
         .single()
       setSession(s)
 
-      const [{ data: p }, { data: qs }, { data: prev }] = await Promise.all([
+      const [{ data: p }, { data: qs }, { data: prev }, { data: recent }] = await Promise.all([
         supabase.from('profiles').select('grade').eq('id', s?.student_id).single(),
         supabase.rpc('get_questions_for_session', { p_session_id: sessionId }),
         supabase.from('sessions')
@@ -176,9 +180,26 @@ export default function SessionReport() {
           .eq('passage_id', s?.passage_id)
           .eq('student_id', s?.student_id)
           .neq('id', sessionId),
+        supabase.from('sessions')
+          .select('id, word_results, created_at')
+          .eq('student_id', s?.student_id)
+          .lte('created_at', s?.created_at)
+          .order('created_at', { ascending: false })
+          .limit(5),
       ])
       setGrade(p?.grade ?? null)
       setQuestions(qs ?? [])
+      // selectStumbleWords expects oldest first / latest last
+      const inOrder = (recent ?? []).slice().reverse()
+      setStumbleWords(selectStumbleWords(inOrder))
+
+      const { data: drills } = await supabase
+        .from('drill_attempts')
+        .select('stumble_word')
+        .eq('session_id', sessionId)
+        .eq('was_correct', true)
+      const distinct = new Set((drills ?? []).map((d) => String(d.stumble_word).toLowerCase()))
+      setDrillAceCount(distinct.size)
 
       if (prev && prev.length > 0) {
         const prevBestAccuracy = Math.max(...prev.map(r => r.score_accuracy))
@@ -214,14 +235,16 @@ export default function SessionReport() {
     const isNewAcc = personalBest?.newAccuracy
     const isNewWpm = personalBest?.newWpm
     const compAced = session.score_comprehension != null && session.score_comprehension >= 80
-    if (isNewAcc || isNewWpm || compAced) {
+    const drillAced = drillAceCount >= 3
+    if (isNewAcc || isNewWpm || compAced || drillAced) {
       celebratedRef.current = true
       feedback('celebrate')
       if (isNewAcc) awardMilestone('personal_best_accuracy', { session_id: session.id })
       if (isNewWpm) awardMilestone('personal_best_wpm', { session_id: session.id })
       if (compAced) awardMilestone('comprehension_aced', { session_id: session.id })
+      if (drillAced) awardMilestone('drill_session_aced', { session_id: session.id })
     }
-  }, [session, personalBest])
+  }, [session, personalBest, drillAceCount])
 
   if (!session) {
     return (
@@ -243,7 +266,8 @@ export default function SessionReport() {
   const phrasing = session.score_phrasing ?? session.score_fluency ?? 0
   const isNewBest = personalBest && (personalBest.newAccuracy || personalBest.newWpm)
   const comprehensionAced = session.score_comprehension != null && session.score_comprehension >= 80
-  const showCelebration = !!(isNewBest || comprehensionAced)
+  const drillAced = drillAceCount >= 3
+  const showCelebration = !!(isNewBest || comprehensionAced || drillAced)
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -407,6 +431,8 @@ export default function SessionReport() {
         {questions.length > 0 && session.comprehension_answers != null && (
           <ComprehensionResults questions={questions} answers={session.comprehension_answers} />
         )}
+
+        <StumbleDrillCard stumbleWords={stumbleWords} sessionId={sessionId} />
 
         {/* Word-by-word */}
         <div className="bg-white rounded-2xl shadow-sm p-5">

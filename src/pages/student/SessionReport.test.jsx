@@ -6,6 +6,9 @@ const mockNavigate = vi.fn()
 vi.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
   useParams: () => ({ sessionId: 'session-1' }),
+  Link: ({ to, children, ...rest }) => (
+    <a href={typeof to === 'string' ? to : '#'} {...rest}>{children}</a>
+  ),
 }))
 
 const BASE_SESSION = {
@@ -37,9 +40,11 @@ const QUESTION = {
   display_order: 1,
 }
 
-const { sessionRef, prevSessionsRef, questionsRef, profileRef, vocabRef, progressRef, updateCalls, rpcCalls, rpcMock, mockFeedback, mockAwardMilestone } = vi.hoisted(() => ({
+const { sessionRef, prevSessionsRef, recentSessionsRef, drillAttemptsRef, questionsRef, profileRef, vocabRef, progressRef, updateCalls, rpcCalls, rpcMock, mockFeedback, mockAwardMilestone } = vi.hoisted(() => ({
   sessionRef: { data: null },
   prevSessionsRef: { data: [] },
+  recentSessionsRef: { data: [] },
+  drillAttemptsRef: { data: [] },
   questionsRef: { data: [] },
   profileRef: { data: { grade: 10 } },
   vocabRef: { data: [] },
@@ -80,6 +85,17 @@ vi.mock('../../lib/supabase', () => ({
             if (fields && fields.includes('passages')) {
               return { eq: () => ({ single: () => Promise.resolve({ data: sessionRef.data }) }) }
             }
+            if (fields && fields.includes('word_results')) {
+              return {
+                eq: () => ({
+                  lte: () => ({
+                    order: () => ({
+                      limit: () => Promise.resolve({ data: recentSessionsRef.data }),
+                    }),
+                  }),
+                }),
+              }
+            }
             return {
               eq: () => ({
                 eq: () => ({
@@ -116,6 +132,15 @@ vi.mock('../../lib/supabase', () => ({
           select: () => ({ eq: () => Promise.resolve({ data: progressRef.data }) }),
         }
       }
+      if (table === 'drill_attempts') {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => Promise.resolve({ data: drillAttemptsRef.data }),
+            }),
+          }),
+        }
+      }
       return {}
     },
     rpc: (...args) => rpcMock(...args),
@@ -126,6 +151,8 @@ beforeEach(() => {
   mockNavigate.mockReset()
   sessionRef.data = { ...BASE_SESSION }
   prevSessionsRef.data = []
+  recentSessionsRef.data = []
+  drillAttemptsRef.data = []
   questionsRef.data = []
   profileRef.data = { grade: 10 }
   vocabRef.data = []
@@ -541,5 +568,74 @@ describe('SessionReport — celebrations', () => {
     render(<SessionReport />)
     await waitFor(() => screen.getByText('Test Passage'))
     expect(mockAwardMilestone).not.toHaveBeenCalled()
+  })
+})
+
+// ─── Stumble drill card integration ───────────────────────────────────────────
+
+describe('SessionReport — stumble drill card', () => {
+  it('renders Practise card chips from recent stumble words', async () => {
+    recentSessionsRef.data = [
+      {
+        id: 'session-1',
+        word_results: [
+          { word: 'fraudulent', status: 'substitution' },
+          { word: 'discriminate', status: 'omission' },
+        ],
+      },
+    ]
+    render(<SessionReport />)
+    await waitFor(() => screen.getByText('Practise these words'))
+    expect(screen.getByRole('link', { name: /fraudulent/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /discriminate/i })).toBeInTheDocument()
+  })
+
+  it('does NOT render the drill card when there are no stumble words', async () => {
+    recentSessionsRef.data = [
+      { id: 'session-1', word_results: [{ word: 'hello', status: 'correct' }] },
+    ]
+    render(<SessionReport />)
+    await waitFor(() => screen.getByText('Test Passage'))
+    expect(screen.queryByText('Practise these words')).not.toBeInTheDocument()
+  })
+
+  it('awards drill_session_aced milestone when 3 distinct stumble words have correct drill attempts', async () => {
+    drillAttemptsRef.data = [
+      { stumble_word: 'fraudulent' },
+      { stumble_word: 'discriminate' },
+      { stumble_word: 'amplify' },
+    ]
+    render(<SessionReport />)
+    await waitFor(() =>
+      expect(mockAwardMilestone).toHaveBeenCalledWith('drill_session_aced', { session_id: 'session-1' }),
+    )
+  })
+
+  it('does NOT award drill_session_aced when only 2 distinct words are correct', async () => {
+    drillAttemptsRef.data = [
+      { stumble_word: 'fraudulent' },
+      { stumble_word: 'discriminate' },
+    ]
+    render(<SessionReport />)
+    await waitFor(() => screen.getByText('Test Passage'))
+    expect(mockAwardMilestone).not.toHaveBeenCalledWith(
+      'drill_session_aced',
+      expect.anything(),
+    )
+  })
+
+  it('counts distinct stumble words case-insensitively for drill ace detection', async () => {
+    drillAttemptsRef.data = [
+      { stumble_word: 'Fraudulent' },
+      { stumble_word: 'fraudulent' },
+      { stumble_word: 'discriminate' },
+    ]
+    render(<SessionReport />)
+    await waitFor(() => screen.getByText('Test Passage'))
+    // Only 2 distinct lowercased: fraudulent, discriminate → no ace
+    expect(mockAwardMilestone).not.toHaveBeenCalledWith(
+      'drill_session_aced',
+      expect.anything(),
+    )
   })
 })

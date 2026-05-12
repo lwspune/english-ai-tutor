@@ -8,6 +8,7 @@ export const MILESTONE_KIND = {
   PERSONAL_BEST_WPM: 'personal_best_wpm',
   COMPREHENSION_ACED: 'comprehension_aced',
   WORD_MASTERED: 'word_mastered',
+  DRILL_SESSION_ACED: 'drill_session_aced',
 }
 
 export async function awardMilestone(kind, payload = {}) {

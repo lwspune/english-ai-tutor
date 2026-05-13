@@ -149,6 +149,7 @@ export default function TeacherDashboard() {
         <button onClick={() => navigate('/teacher/passages')} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">Manage Passages</button>
         <button onClick={() => navigate('/teacher/completion')} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">Passage Completion</button>
         <button onClick={() => navigate('/teacher/audio-review')} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">Audio Review</button>
+        <button onClick={() => navigate('/teacher/waitlist')} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">Waitlist</button>
         <div className="h-4 w-px bg-slate-200 mx-1 hidden sm:block" />
         {classCode && (
           <button

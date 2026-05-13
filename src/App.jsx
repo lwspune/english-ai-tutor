@@ -16,6 +16,7 @@ import PassageManager from './pages/teacher/PassageManager'
 import StudentDetail from './pages/teacher/StudentDetail'
 import PassageCompletion from './pages/teacher/PassageCompletion'
 import AudioReview from './pages/teacher/AudioReview'
+import WaitlistPage from './pages/teacher/WaitlistPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 
 function RootRoute() {
@@ -51,6 +52,7 @@ export default function App() {
           <Route path="/teacher/student/:studentId" element={<ProtectedRoute role="teacher"><StudentDetail /></ProtectedRoute>} />
           <Route path="/teacher/completion" element={<ProtectedRoute role="teacher"><PassageCompletion /></ProtectedRoute>} />
           <Route path="/teacher/audio-review" element={<ProtectedRoute role="teacher"><AudioReview /></ProtectedRoute>} />
+          <Route path="/teacher/waitlist" element={<ProtectedRoute role="teacher"><WaitlistPage /></ProtectedRoute>} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

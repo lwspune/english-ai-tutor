@@ -13,12 +13,16 @@ vi.mock('../../lib/AuthContext', () => ({
 }))
 
 vi.mock('../../components/QuestionPanel', () => ({
-  default: () => null,
+  default: ({ onDelete }) => (
+    <button data-testid="mock-delete-question" onClick={() => onDelete('q1')}>Delete Q</button>
+  ),
 }))
 
-const { mockInsert, insertResponse } = vi.hoisted(() => ({
+const { mockInsert, insertResponse, passagesData, questionDeleteResponse } = vi.hoisted(() => ({
   mockInsert: vi.fn(),
   insertResponse: { current: { data: null, error: null } },
+  passagesData: { current: [] },
+  questionDeleteResponse: { current: { error: null } },
 }))
 
 vi.mock('../../lib/supabase', () => ({
@@ -26,12 +30,24 @@ vi.mock('../../lib/supabase', () => ({
     from: (table) => {
       if (table === 'passages') {
         return {
-          select: () => ({ order: () => Promise.resolve({ data: [] }) }),
+          select: () => ({
+            order: () => Promise.resolve({ data: passagesData.current }),
+            in: () => Promise.resolve({ data: [] }),
+          }),
           insert: (payload) => {
             mockInsert(payload)
             return Promise.resolve(insertResponse.current)
           },
           delete: () => ({ eq: () => Promise.resolve({}) }),
+        }
+      }
+      if (table === 'questions') {
+        return {
+          select: () => ({
+            in: () => Promise.resolve({ data: [] }),
+            eq: () => ({ order: () => Promise.resolve({ data: [] }) }),
+          }),
+          delete: () => ({ eq: () => Promise.resolve(questionDeleteResponse.current) }),
         }
       }
       return {}
@@ -117,6 +133,8 @@ describe('PassageManager — error surfacing (Finding 12)', () => {
     mockInsert.mockClear()
     mockNavigate.mockReset()
     insertResponse.current = { data: null, error: null }
+    passagesData.current = []
+    questionDeleteResponse.current = { error: null }
   })
 
   it('shows an error banner and keeps the form open when insert fails', async () => {
@@ -131,5 +149,20 @@ describe('PassageManager — error surfacing (Finding 12)', () => {
     await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument())
     // Form should remain open since the save failed
     expect(screen.getByRole('button', { name: /save passage/i })).toBeInTheDocument()
+  })
+
+  it('surfaces an error when deleting a question fails', async () => {
+    const user = userEvent.setup()
+    passagesData.current = [
+      { id: 'p1', title: 'Test Passage', content: 'words', word_count: 1, grade_level: '10', difficulty: 'easy' },
+    ]
+    questionDeleteResponse.current = { error: { message: 'delete blocked by trigger' } }
+    render(<PassageManager />)
+    // Expand the questions panel for the passage
+    await user.click(await screen.findByRole('button', { name: /questions \(\d+\)/i }))
+    // Trigger delete via the mocked QuestionPanel
+    await user.click(await screen.findByTestId('mock-delete-question'))
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument())
+    expect(screen.getByRole('alert')).toHaveTextContent(/delete blocked by trigger/i)
   })
 })

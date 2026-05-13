@@ -243,9 +243,9 @@ export default function LoginPage() {
                 value={signupPassword}
                 onChange={e => setSignupPassword(e.target.value)}
                 required
-                minLength={6}
+                minLength={8}
                 className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="At least 6 characters"
+                placeholder="At least 8 characters"
               />
             </div>
             <div>

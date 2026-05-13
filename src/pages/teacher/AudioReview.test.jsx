@@ -38,7 +38,6 @@ vi.mock('../../lib/supabase', () => ({
   },
 }))
 
-let lastAudio
 const originalAudio = globalThis.Audio
 
 beforeEach(() => {
@@ -49,7 +48,6 @@ beforeEach(() => {
   rpcMock.mockResolvedValue({ data: null, error: null })
   mockSessions.value = []
 
-  lastAudio = null
   function MockAudio(src) {
     this.src = src
     this.play = vi.fn(() => Promise.resolve())
@@ -58,7 +56,6 @@ beforeEach(() => {
       if (event === 'ended') this._onEnded = cb
     })
     this.removeEventListener = vi.fn()
-    lastAudio = this
   }
   globalThis.Audio = MockAudio
 })

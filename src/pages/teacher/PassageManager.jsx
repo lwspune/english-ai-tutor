@@ -147,7 +147,12 @@ export default function PassageManager() {
   }
 
   async function handleDeleteQuestion(passageId, questionId) {
-    await supabase.from('questions').delete().eq('id', questionId)
+    setSaveError('')
+    const { error } = await supabase.from('questions').delete().eq('id', questionId)
+    if (error) {
+      setSaveError(error.message || 'Failed to delete question. Please try again.')
+      return
+    }
     setQuestionsByPassage(prev => ({
       ...prev,
       [passageId]: (prev[passageId] ?? []).filter(q => q.id !== questionId),

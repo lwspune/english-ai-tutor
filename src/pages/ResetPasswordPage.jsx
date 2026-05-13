@@ -4,10 +4,20 @@ import { supabase } from '../lib/supabase'
 
 const RESET_URL = 'https://english-ai-tutor-mauve.vercel.app/reset-password'
 
+// Parse the URL hash for an OAuth-style error_code param. Runs as a useState
+// initialiser (once at mount) so we don't trigger a cascading render via a
+// setState inside useEffect.
+function parseHashLinkError() {
+  const hash = window.location.hash
+  if (!hash.includes('error=')) return null
+  const params = new URLSearchParams(hash.slice(1))
+  return params.get('error_code') === 'otp_expired' ? 'expired' : 'invalid'
+}
+
 export default function ResetPasswordPage() {
   const navigate = useNavigate()
   const [session, setSession] = useState(null)
-  const [linkError, setLinkError] = useState(null) // 'expired' | 'invalid' | null
+  const [linkError] = useState(parseHashLinkError) // 'expired' | 'invalid' | null
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState('')
@@ -17,18 +27,12 @@ export default function ResetPasswordPage() {
   const [resetSubmitting, setResetSubmitting] = useState(false)
 
   useEffect(() => {
-    const hash = window.location.hash
-    if (hash.includes('error=')) {
-      const params = new URLSearchParams(hash.slice(1))
-      const code = params.get('error_code')
-      setLinkError(code === 'otp_expired' ? 'expired' : 'invalid')
-      return
-    }
+    if (linkError) return
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') setSession(session)
     })
     return () => subscription.unsubscribe()
-  }, [])
+  }, [linkError])
 
   async function handleSubmit(e) {
     e.preventDefault()

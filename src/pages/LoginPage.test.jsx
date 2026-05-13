@@ -78,7 +78,7 @@ describe('LoginPage — signup grade is optional', () => {
     fireEvent.click(screen.getByRole('button', { name: /sign up/i }))
     fireEvent.change(screen.getByPlaceholderText(/aarav shah/i), { target: { value: 'Test Student' } })
     fireEvent.change(screen.getByPlaceholderText(/you@school\.com/i), { target: { value: 'student@test.com' } })
-    fireEvent.change(screen.getByPlaceholderText(/at least 6 characters/i), { target: { value: 'pw123456' } })
+    fireEvent.change(screen.getByPlaceholderText(/at least 8 characters/i), { target: { value: 'pw1234567' } })
     if (grade) {
       fireEvent.change(screen.getByLabelText(/grade/i), { target: { value: grade } })
     }
@@ -107,6 +107,13 @@ describe('LoginPage — signup grade is optional', () => {
     fireEvent.click(screen.getByRole('button', { name: /sign up/i }))
     const select = screen.getByLabelText(/grade/i)
     expect(select).not.toBeRequired()
+  })
+
+  it('signup password requires at least 8 characters (consistent with reset + teacher-created accounts)', () => {
+    renderPage()
+    fireEvent.click(screen.getByRole('button', { name: /sign up/i }))
+    const passwordInput = screen.getByPlaceholderText(/at least 8 characters/i)
+    expect(passwordInput).toHaveAttribute('minLength', '8')
   })
 })
 

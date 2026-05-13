@@ -9,7 +9,7 @@ const FEATURES = [
   },
   {
     title: 'Targeted vocab drill',
-    body: '865 NDA-list words with synonyms, antonyms, audio pronunciation, and a Leitner spaced-repetition deck. The words you skipped while reading come back as drill the next day.',
+    body: 'NDA-list words with synonyms, antonyms, and audio pronunciation. A Leitner spaced-repetition deck schedules reviews; words you skipped while reading come back as drill the next day.',
   },
   {
     title: 'Comprehension you can prove',
@@ -73,8 +73,8 @@ export default function LandingPage() {
             Built around the NDA English syllabus, not a generic test-prep app.
           </p>
           <p className="text-sm text-slate-500">
-            Currently in private classroom use at <span className="font-medium text-slate-700">LWS Pune</span> with
-            73 students. Opening for individual aspirants soon.
+            Currently in private classroom use at <span className="font-medium text-slate-700">LWS Pune</span>.
+            Opening for individual aspirants soon.
           </p>
         </section>
 

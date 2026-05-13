@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
+import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
 import StudentHome from './pages/student/StudentHome'
 import ReadingSession from './pages/student/ReadingSession'
@@ -17,11 +18,13 @@ import PassageCompletion from './pages/teacher/PassageCompletion'
 import AudioReview from './pages/teacher/AudioReview'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 
-function RootRedirect() {
-  const { profile, loading } = useAuth()
+function RootRoute() {
+  const { user, profile, loading } = useAuth()
   if (loading) return null
-  if (!profile) return <Navigate to="/login" replace />
-  if (profile.role === 'teacher') return <Navigate to="/teacher" replace />
+  // Unauthenticated visitors see the public landing page (waitlist for the
+  // NDA-aspirant trial). Logged-in users get redirected to their dashboard.
+  if (!user) return <LandingPage />
+  if (profile?.role === 'teacher') return <Navigate to="/teacher" replace />
   return <Navigate to="/student" replace />
 }
 
@@ -32,7 +35,7 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
-          <Route path="/" element={<ProtectedRoute><RootRedirect /></ProtectedRoute>} />
+          <Route path="/" element={<RootRoute />} />
 
           <Route path="/student" element={<ProtectedRoute role="student"><StudentHome /></ProtectedRoute>} />
           <Route path="/student/session/:passageId" element={<ProtectedRoute role="student"><ReadingSession /></ProtectedRoute>} />

@@ -22,6 +22,18 @@ Keep entries to ~5–10 lines. If a decision needs more rationale, link to a mem
 
 ---
 
+## 2026-05-13 — B2C public trial: validate demand via waitlist before any Phase 1 build
+
+**Decision:** Open `/` to a public landing page targeted at NDA aspirants (individuals without a teacher) with a free email-only waitlist. Capture `?src=<channel>` for attribution. Defer the actual paid product (payments, FA migration, content scaling, guest/demo class architecture) to Phase 1 — gated on the waitlist hitting 50 signups organically. Don't show pricing on the landing page; "early-access pricing at launch" is the only commitment. Org-only byline (LWS Pune), no personal name. Migration 030 created `waitlist_signups`. New `/teacher/waitlist` page surfaces the count + source breakdown.
+
+**Context:** User's product fits NDA aspirants well (865 NDA-list vocab, retrofitted passages, deliberate-practice drill, comprehension scoring). NDA aspirants pay ₹15K-50K for full coaching, so ₹2000-5000/year for English-specific tooling has real pricing power. But the existing app is teacher-augmented — the school deployment assumes one teacher distributing class codes, mixing public trial users into Shreya's real classroom would contaminate stats and burn OpenAI cost on freeloaders. Two-week landing-page test costs ~2 hours of work; building payments + FA + content pipeline before validating demand is 6-8 weeks of speculative work. Phase 0 is the cheap experiment; Phase 1 is the real build.
+
+**Watch:** (1) Waitlist signup count over the next 6 weeks. <10 = messaging is wrong (rewrite copy, retry). 10-30 = single-channel weak (try another platform). 50+ = demand validated, commit to Phase 1. (2) Source distribution — if `direct` dominates (no attribution), channels aren't the differentiator. If `reddit` outperforms `teachers`, peer-distribution thesis fails; if `teachers` wins, teacher-as-channel becomes the strategy. (3) Conversion-to-action: any waitlist signup who replies to a follow-up email is a higher-quality signal than the count itself.
+
+**Revisit trigger:** 2026-06-24 (6 weeks). If <50 signups, the trial assumption is wrong — either the audience isn't reachable through the channels we have, or the value prop doesn't translate without a teacher in the loop. If >50, the next decision is pricing model (subscription vs lifetime, ₹2K vs ₹5K) and which Phase 1 component blocks first launch (probably FA migration since paying customers will refund-request on Whisper-inflated scores).
+
+---
+
 ## 2026-05-12 — Stop gating on grade; keep the field as a label
 
 **Decision:** Remove grade as an access gate everywhere. Migration 029 drops the `students read grade passages` RLS policy and replaces it with `read passages using (true)`. analyze-reading drops its 403 grade-mismatch check. StudentHome drops the `.or(grade_level.eq.X)` filter. BottomNav / VocabHome / VocabPractice / SessionReport drop the `VOCAB_GRADES = {'11','12','MBA'}` set so vocab is available to every student. TeacherDashboard's vocab-mastery stat drops the `['11','12','MBA']` student filter and becomes class-wide. Signup grade becomes optional ("Prefer not to say" → null). `profiles.grade` and `passages.grade_level` stay on the schema as labels; `WPM_TARGETS` still consults grade per-student (falls back to 150 when null).
@@ -72,6 +84,8 @@ Keep entries to ~5–10 lines. If a decision needs more rationale, link to a mem
 
 **Revisit trigger:** 4 weeks (2026-06-09). If sessions still show the pattern of "first paragraph systematically more wrong than later paragraphs," the fix didn't take and we revisit (maybe option 3 — dim passage until recording — becomes the right call). If accuracy normalises, decision sticks.
 
+## 2026-05-12 — Retrofit 5 grade-12 passages with NDA-list overlap to validate the reading→vocab loop
+
 **Decision:** Hand-retrofit 5 grade-12 passages (Trees, Discipline, Honesty, Mental Health Awareness, The Power of Empathy) with 6–9 NDA-list words each. Don't drop+regenerate the remaining 25 passages yet, despite a real argument for doing so eventually.
 
 **Context:** Shreya (grade 12, 10 sessions, 38 vocab progress rows, 0 mastered) revealed two issues. (1) VocabHome UX hides legitimate progress — fixed in 5ac09a5. (2) The 30 grade-12 passages contain zero NDA-list words, so `record_vocab_reading_encounters` has been silent across the entire library, leaving the "reading reinforces vocab" loop in CLAUDE.md non-functional. User proposed dropping all 30 and regenerating; I pushed back because (a) it would cascade-delete the 90 existing sessions' passage refs and the 120 attached MCQs, (b) the underlying join hasn't been validated — we don't yet know the loop actually fires when content does overlap. Phased plan: ship 5 retrofits now, watch, then decide between bulk-retrofit-remaining-25 vs Path-B regenerate (deprecate-old + add-new).
@@ -89,3 +103,33 @@ Keep entries to ~5–10 lines. If a decision needs more rationale, link to a mem
 **Watch:** whether the cadence is actually run. Whether DECISIONS.md grows. Whether roadmap items get "what we'll learn" tags written in earnest.
 
 **Revisit trigger:** student count crosses 500 AND Phase 1 FA migration has shipped (so the underlying metric is honest) AND the team has bandwidth for the infra cost. Until all three are true, manual observation + deliberate iteration beats automation.
+
+## 2026-05-16 — Trend-anomaly outlier chip as v1 anti-cheat tripwire
+
+**Decision:** Add a UI-only heuristic chip ("Outlier — review") to `StudentDetail` session rows where the score is dramatically out of trend versus the student's other sessions. Rule lives in `src/lib/anomalyFlag.js` (`accuracy >= 95 AND >= 2 other sessions AND accuracy >= mean(others) + 20`). No server-side enforcement; teacher reviews and decides. Defer harder anti-cheat layers (voice-fingerprint comparison, liveness via per-attempt random word insertion) until cheating frequency justifies the build cost.
+
+**Context:** First confirmed AI-assistant cheating case (Gurusai, 2026-05-16) — free-form wav2vec2 transcription caught ChatGPT-voice-mode interjections in his Inclusive Growth audio. Investigation also surfaced a second suspected pure-TTS read on Env Prot (suspiciously clean transcript, both engines fooled). Both Whisper and FA are structurally blind to clean TTS reads — they only see the passage words present in the audio. The accuracy-out-of-trend signal is the cheapest universally-available trip, calibrated against Gurusai (Env Prot 100% vs ~64% mean across his other reads → gap 36 → flagged). User confirmed Gurusai independently; he accepted.
+
+**Watch:** (1) False-positive rate. If the teacher dismisses the chip on 30%+ of flagged sessions as "genuine improvement," the threshold is too sensitive — tighten to gap ≥ 25 or require ≥ 3 other sessions. (2) Confirmed cheat count over the next 30 days. If multiple chips correspond to verified cheats, v1 surface is earning its keep. (3) Cheating frequency — if ≥5 confirmed cases in 30 days, anti-cheat moves from defer-list to active build (liveness or voice fingerprint).
+
+**Revisit trigger:** 30 days (2026-06-15) for the calibration check, OR ≥5 confirmed cheats whichever first.
+
+## 2026-05-16 — Pass passage as Whisper `prompt` to bias decoder toward expected vocabulary
+
+**Decision:** `analyze-reading` v19 passes the first 800 chars (~200 tokens) of `passageText` as Whisper's `prompt` parameter. Biases the decoder toward expected vocabulary; expected to close ~60–70% of the Whisper-vs-FA gap on IE-accented real readers at zero cost (Whisper is billed on audio duration, not prompt size). Trade-off: weakens substitution-count as a cheating signal (TTS-read passages transcribe cleaner), but the outlier chip above catches the accuracy-shape signature regardless.
+
+**Context:** Round 2B FA spike (n=21, 2026-05-16) revealed Whisper genuinely over-substitutes IE-accent real readers — Pratibha −10.8, Harshad −8.8, Shankar −6 mean gap to FA. Free-form wav2vec2 transcripts confirmed these students really read the passages; Whisper was just picking phonetically similar wrong words. Prompt biasing is a single-line change that addresses the bulk of the gap. The structural FA migration remains the correct long-term end-state but no longer urgent — Whisper now scores honestly enough that the mastery gate isn't dishonest in practice. Supersedes the urgency framing of the 2026-05-12 "Park Phase 1 FA migration" entry (the parked decision still holds; the urgency to revive it is reduced).
+
+**Watch:** (1) Per-voice avg accuracy on Pratibha/Harshad/Shankar over the next 5–7 days. Expected to shift up 5–10 points if the prompt is working. If no movement, the prompt isn't biasing as expected and FA case re-strengthens. (2) New substitution distribution — if subs drop sharply across the board AND the outlier chip starts firing on clean readers (false positives), the bias is too strong. (3) Class avg accuracy delta — should rise modestly; if it jumps >5pts class-wide, the inflation is real, not just per-voice fairness.
+
+**Revisit trigger:** 7 days (2026-05-23) for the per-voice check. If no per-voice movement, document the surprise and re-prioritise FA migration. If movement is large enough that genuine-improvement chips fire too often, narrow the prompt (first 400 chars instead of 800, or content-only filtering).
+
+## 2026-05-16 — send-reminders v9 templates: personalised subjects + plain-text alternative
+
+**Decision:** Rewrite the activation/re-engagement email templates with personalised subject lines leading on the hook (`Try your first passage, {name} — 2 minutes` / `{lastAccuracy}% last time, {name} — push it higher?`), plain-text alternative alongside HTML (single biggest deliverability win per Resend), reply-to-help footer for legitimacy signal. Adds a `test_mode` body path so future template changes can be verified without waiting for the next 04:30 UTC cron.
+
+**Context:** 72 of 76 students have received at least one reminder; **57 (79%) have never done a session post-reminder**. Cron + function were firing correctly (200 in ~62s for 64 emails); the conversion was poor. Three suspected root causes ranked: spam-folder placement (Resend domain young, no DMARC alignment), generic copy (every SaaS-tool email looks the same), broken activation links. The template rewrite addresses the second cause directly and the first cause indirectly (plain-text alt is the biggest deliverability signal).
+
+**Watch:** (1) Conversion rate — `reminded AND session within 7d of last reminder` over the next 2 weeks. Baseline 7/72 = 10%. Expect at least 15–20% if templates were the bottleneck. (2) Resend dashboard — open + click rates on the new batch. If opens jump but clicks don't, the copy is hooking but the CTA is wrong. If neither moves, deliverability is the real blocker. (3) Any student replies — the reply-to-help footer should produce occasional replies; zero replies in 30 days = emails aren't landing.
+
+**Revisit trigger:** 14 days (2026-05-30). If conversion is still <12%, the copy isn't the bottleneck — investigate deliverability (Resend dashboard, spam-test tools, DMARC). If conversion ≥18%, lock in the template and look for the next bottleneck.

@@ -302,12 +302,25 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Transcribe with Whisper
+    // Transcribe with Whisper. Pass the passage as `prompt` to bias the
+    // decoder toward expected vocabulary — substantially reduces false
+    // substitutions on IE-accented readers (Round 2B spike showed Whisper
+    // over-substitutes their reads versus FA acoustic alignment).
+    //
+    // Whisper considers ~224 tokens of prompt; 800 chars ≈ ~200 tokens is
+    // safely under the limit. For passages > ~150 words, we bias toward
+    // the start (where unusual vocabulary tends to be front-loaded).
+    //
+    // Trade-off: weaker substitution-count signal for AI-assistant cheating
+    // detection. Mitigated by the trend-anomaly outlier chip on
+    // StudentDetail (commit 81e9051), which catches the accuracy-shape
+    // signature regardless of substitution count.
     const formData = new FormData()
     formData.append('file', new File([audioData], 'audio.webm', { type: 'audio/webm' }))
     formData.append('model', 'whisper-1')
     formData.append('response_format', 'verbose_json')
     formData.append('timestamp_granularities[]', 'word')
+    formData.append('prompt', passageText.slice(0, 800))
 
     const whisperRes = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',

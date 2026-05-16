@@ -303,8 +303,8 @@ export default function StudentDetail() {
             { label: 'Avg Phrasing', value: avgPhrasing != null ? `${avgPhrasing}%` : '—' },
             { label: 'Avg Comprehension', value: avgComprehension != null ? `${avgComprehension}%` : '—' },
           ].map(stat => (
-            <div key={stat.label} className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
-              <p className="text-2xl font-bold text-slate-800">{stat.value}</p>
+            <div key={stat.label} className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow hover:-translate-y-0.5 transition-all duration-200 p-4 text-center">
+              <p className="text-3xl font-bold text-slate-900 tracking-tight">{stat.value}</p>
               <p className="text-xs text-slate-500 mt-1">{stat.label}</p>
               {stat.sub && (
                 <p className={`text-xs mt-0.5 font-medium ${stat.subColor}`}>{stat.sub}</p>
@@ -324,7 +324,7 @@ export default function StudentDetail() {
           const wpmMax = Math.ceil(Math.max(wpmTarget * 1.2, ...wpm) / 10) * 10
           return (
             <div>
-              <h2 className="text-base font-semibold text-slate-700 mb-3">Performance Trends</h2>
+              <h2 className="text-lg font-semibold text-slate-900 tracking-tight mb-3">Performance Trends</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <MetricCard label="Accuracy" values={accuracy} color="#3b82f6" fillColor="#dbeafe" unit="%" />
                 <MetricCard
@@ -369,23 +369,23 @@ export default function StudentDetail() {
         {/* Vocab progress */}
         {vocabStats && (
           <div>
-            <h2 className="text-base font-semibold text-slate-700 mb-3">Vocab Progress</h2>
+            <h2 className="text-lg font-semibold text-slate-900 tracking-tight mb-3">Vocab Progress</h2>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
-              <div className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
-                <p data-testid="vocab-stat-mastered" className="text-2xl font-bold text-slate-800">{vocabStats.mastered}</p>
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow hover:-translate-y-0.5 transition-all duration-200 p-4 text-center">
+                <p data-testid="vocab-stat-mastered" className="text-3xl font-bold text-slate-900 tracking-tight">{vocabStats.mastered}</p>
                 <p className="text-xs text-slate-500 mt-1">Mastered</p>
                 <p className="text-xs text-slate-400 mt-0.5">of {totalVocab}</p>
               </div>
-              <div className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
-                <p data-testid="vocab-stat-in-progress" className="text-2xl font-bold text-slate-800">{vocabStats.inProgress}</p>
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow hover:-translate-y-0.5 transition-all duration-200 p-4 text-center">
+                <p data-testid="vocab-stat-in-progress" className="text-3xl font-bold text-slate-900 tracking-tight">{vocabStats.inProgress}</p>
                 <p className="text-xs text-slate-500 mt-1">In Progress</p>
               </div>
-              <div className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
-                <p data-testid="vocab-stat-due-now" className={`text-2xl font-bold ${vocabStats.dueNow > 0 ? 'text-amber-600' : 'text-slate-800'}`}>{vocabStats.dueNow}</p>
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow hover:-translate-y-0.5 transition-all duration-200 p-4 text-center">
+                <p data-testid="vocab-stat-due-now" className={`text-3xl font-bold tracking-tight ${vocabStats.dueNow > 0 ? 'text-amber-600' : 'text-slate-900'}`}>{vocabStats.dueNow}</p>
                 <p className="text-xs text-slate-500 mt-1">Due Now</p>
               </div>
-              <div className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
-                <p data-testid="vocab-stat-from-reading" className="text-2xl font-bold text-slate-800">{vocabStats.fromReading}</p>
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow hover:-translate-y-0.5 transition-all duration-200 p-4 text-center">
+                <p data-testid="vocab-stat-from-reading" className="text-3xl font-bold text-slate-900 tracking-tight">{vocabStats.fromReading}</p>
                 <p className="text-xs text-slate-500 mt-1">From Reading</p>
               </div>
             </div>
@@ -407,18 +407,18 @@ export default function StudentDetail() {
         {/* Drill activity */}
         {drillStats && (
           <div>
-            <h2 className="text-base font-semibold text-slate-700 mb-3">Drill Activity</h2>
+            <h2 className="text-lg font-semibold text-slate-900 tracking-tight mb-3">Drill Activity</h2>
             <div className="grid grid-cols-3 gap-3 mb-3">
-              <div className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
-                <p data-testid="drill-stat-attempts" className="text-2xl font-bold text-slate-800">{drillStats.attempts}</p>
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow hover:-translate-y-0.5 transition-all duration-200 p-4 text-center">
+                <p data-testid="drill-stat-attempts" className="text-3xl font-bold text-slate-900 tracking-tight">{drillStats.attempts}</p>
                 <p className="text-xs text-slate-500 mt-1">Attempts</p>
               </div>
-              <div className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
-                <p data-testid="drill-stat-distinct-words" className="text-2xl font-bold text-slate-800">{drillStats.distinctWords}</p>
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow hover:-translate-y-0.5 transition-all duration-200 p-4 text-center">
+                <p data-testid="drill-stat-distinct-words" className="text-3xl font-bold text-slate-900 tracking-tight">{drillStats.distinctWords}</p>
                 <p className="text-xs text-slate-500 mt-1">Distinct Words</p>
               </div>
-              <div className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
-                <p data-testid="drill-stat-correct-rate" className={`text-2xl font-bold ${drillStats.correctRate >= 60 ? 'text-green-600' : drillStats.correctRate >= 40 ? 'text-yellow-600' : 'text-red-500'}`}>{drillStats.correctRate}%</p>
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow hover:-translate-y-0.5 transition-all duration-200 p-4 text-center">
+                <p data-testid="drill-stat-correct-rate" className={`text-3xl font-bold tracking-tight ${drillStats.correctRate >= 60 ? 'text-green-600' : drillStats.correctRate >= 40 ? 'text-yellow-600' : 'text-red-500'}`}>{drillStats.correctRate}%</p>
                 <p className="text-xs text-slate-500 mt-1">Correct</p>
               </div>
             </div>
@@ -455,7 +455,7 @@ export default function StudentDetail() {
 
         {/* Session progress table */}
         <div>
-          <h2 className="text-base font-semibold text-slate-700 mb-3">Session Progress</h2>
+          <h2 className="text-lg font-semibold text-slate-900 tracking-tight mb-3">Session Progress</h2>
           {sessions.length === 0 ? (
             <p className="text-sm text-slate-400">No sessions yet.</p>
           ) : (

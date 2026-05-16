@@ -305,8 +305,8 @@ export default function TeacherDashboard() {
       <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
         {/* Needs Your Attention — surfaces outliers, inactive, and never-started students */}
         {students.length > 0 && (
-          <section className="bg-white rounded-2xl border border-slate-200 p-5">
-            <h2 className="text-base font-semibold text-slate-700 mb-4">Needs Your Attention</h2>
+          <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+            <h2 className="text-lg font-semibold text-slate-900 tracking-tight mb-4">Needs Your Attention</h2>
             <div className="space-y-4">
               {/* Outlier sessions */}
               <div data-testid="attention-outliers">
@@ -381,30 +381,30 @@ export default function TeacherDashboard() {
         {/* This Week — pulse strip of weekly activity */}
         {pulse && (
           <section>
-            <h2 className="text-base font-semibold text-slate-700 mb-3">This Week</h2>
+            <h2 className="text-lg font-semibold text-slate-900 tracking-tight mb-3">This Week</h2>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div data-testid="pulse-sessions" className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
-                <p className="text-2xl font-bold text-slate-800">{pulse.sessions}</p>
-                <p className="text-xs text-slate-500 mt-1">Sessions</p>
+              <div data-testid="pulse-sessions" className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow hover:-translate-y-0.5 transition-all duration-200 p-4 text-center">
+                <p className="text-3xl font-bold text-slate-900 tracking-tight">{pulse.sessions}</p>
+                <p className="text-xs text-slate-500 mt-1 uppercase tracking-wide">Sessions</p>
               </div>
-              <div data-testid="pulse-drills" className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
-                <p className="text-2xl font-bold text-slate-800">{pulse.drills}</p>
-                <p className="text-xs text-slate-500 mt-1">Drills</p>
+              <div data-testid="pulse-drills" className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow hover:-translate-y-0.5 transition-all duration-200 p-4 text-center">
+                <p className="text-3xl font-bold text-slate-900 tracking-tight">{pulse.drills}</p>
+                <p className="text-xs text-slate-500 mt-1 uppercase tracking-wide">Drills</p>
               </div>
-              <div data-testid="pulse-milestones" className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
-                <p className="text-2xl font-bold text-slate-800">{pulse.milestones}</p>
-                <p className="text-xs text-slate-500 mt-1">Milestones</p>
+              <div data-testid="pulse-milestones" className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow hover:-translate-y-0.5 transition-all duration-200 p-4 text-center">
+                <p className="text-3xl font-bold text-slate-900 tracking-tight">{pulse.milestones}</p>
+                <p className="text-xs text-slate-500 mt-1 uppercase tracking-wide">Milestones</p>
               </div>
-              <div data-testid="pulse-reminders" className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
-                <p className="text-2xl font-bold text-slate-800">{pulse.reminders}</p>
-                <p className="text-xs text-slate-500 mt-1">Reminders Sent</p>
+              <div data-testid="pulse-reminders" className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow hover:-translate-y-0.5 transition-all duration-200 p-4 text-center">
+                <p className="text-3xl font-bold text-slate-900 tracking-tight">{pulse.reminders}</p>
+                <p className="text-xs text-slate-500 mt-1 uppercase tracking-wide">Reminders Sent</p>
               </div>
             </div>
           </section>
         )}
 
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-semibold text-slate-700">Class Performance</h2>
+          <h2 className="text-lg font-semibold text-slate-900 tracking-tight">Class Performance</h2>
           <button
             onClick={() => setShowAddStudent(true)}
             className="flex items-center gap-1.5 text-sm font-medium bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
@@ -430,29 +430,29 @@ export default function TeacherDashboard() {
             <>
               {/* Summary stat chips */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
-                <div data-testid="stat-students" className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
-                  <p className="text-2xl font-bold text-slate-800">{students.length}</p>
-                  <p className="text-xs text-slate-500 mt-1">Students</p>
+                <div data-testid="stat-students" className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow hover:-translate-y-0.5 transition-all duration-200 p-4 text-center">
+                  <p className="text-3xl font-bold text-slate-900 tracking-tight">{students.length}</p>
+                  <p className="text-xs text-slate-500 mt-1 uppercase tracking-wide">Students</p>
                 </div>
-                <div data-testid="stat-sessions" className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
-                  <p className="text-2xl font-bold text-slate-800">{totalSessions}</p>
-                  <p className="text-xs text-slate-500 mt-1">Sessions</p>
+                <div data-testid="stat-sessions" className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow hover:-translate-y-0.5 transition-all duration-200 p-4 text-center">
+                  <p className="text-3xl font-bold text-slate-900 tracking-tight">{totalSessions}</p>
+                  <p className="text-xs text-slate-500 mt-1 uppercase tracking-wide">Sessions</p>
                 </div>
-                <div data-testid="stat-accuracy" className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
-                  <p className="text-2xl font-bold text-slate-800">
+                <div data-testid="stat-accuracy" className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow hover:-translate-y-0.5 transition-all duration-200 p-4 text-center">
+                  <p className="text-3xl font-bold text-slate-900 tracking-tight">
                     {classAvgAccuracy !== null ? `${classAvgAccuracy}%` : '—'}
                   </p>
-                  <p className="text-xs text-slate-500 mt-1">Avg Accuracy</p>
+                  <p className="text-xs text-slate-500 mt-1 uppercase tracking-wide">Avg Accuracy</p>
                 </div>
-                <div data-testid="stat-vocab" className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
-                  <p className="text-2xl font-bold text-slate-800">
+                <div data-testid="stat-vocab" className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow hover:-translate-y-0.5 transition-all duration-200 p-4 text-center">
+                  <p className="text-3xl font-bold text-slate-900 tracking-tight">
                     {classVocabMastery !== null ? `${classVocabMastery}%` : '—'}
                   </p>
-                  <p className="text-xs text-slate-500 mt-1">Vocab Mastery</p>
+                  <p className="text-xs text-slate-500 mt-1 uppercase tracking-wide">Vocab Mastery</p>
                 </div>
               </div>
 
-              <div className="bg-white rounded-2xl border border-slate-200 overflow-x-auto">
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-100 bg-slate-50">

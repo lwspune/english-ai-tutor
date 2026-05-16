@@ -75,7 +75,63 @@ update app_settings set class_code = 'NEWCODE' where id = true;
 
 Sender `tutor@lwspune.in`. The domain must be verified on resend.com/domains (SPF + DKIM + return-path DNS records) or Resend returns `403 "domain not verified"`. The `create-student` edge function wraps `sendWelcomeEmail` in `Promise.allSettled`, so failures are logged but never surfaced — user creation looks successful but no email goes out. Verified on 2026-05-13 (DNS records in Hostinger; SPF + MX at `send`, DKIM at `resend._domainkey`).
 
-API key: stored as `RESEND_API_KEY` in Supabase dashboard → Edge Functions → Secrets. Send-only restricted. Used by `create-student` and `send-reminders`. **Rate limit: 2 requests/sec on free tier** — `send-reminders` runs sequentially in a tight loop and can hit it on first daily cron firings with >5 candidates. Workaround: re-fire 2–3 times; each retry only hits the previously-failed students (function only marks `last_reminder_sent` on success). Long-term fix: add a 600ms sleep between iterations in the loop.
+API key: stored as `RESEND_API_KEY` in Supabase dashboard → Edge Functions → Secrets. Send-only restricted. Used by `create-student` and `send-reminders`. **Rate limit: 2 requests/sec on free tier** — `send-reminders` runs sequentially in a tight loop and can hit it on first daily cron firings with >5 candidates. Workaround built into the function as of v8 (commit `91bdb2c`): 600ms sleep between iterations.
+
+### Manually test the `send-reminders` templates (v9+, post-2026-05-16)
+
+The function (v9 onward) accepts a `test_mode` body path that sends one of each template (activation + re-engagement) to a single address, bypassing cohort selection and cooldown. Lets you verify copy + deliverability without waiting for the next 04:30 UTC cron firing.
+
+Auth: same `x-cron-secret` header as the cron path. Get the secret from `app_settings.cron_secret`:
+
+```sql
+select cron_secret from app_settings where id = true;
+```
+
+Request:
+
+```bash
+curl -X POST \
+  https://<project>.supabase.co/functions/v1/send-reminders \
+  -H 'Content-Type: application/json' \
+  -H 'x-cron-secret: <secret>' \
+  -d '{
+    "test_mode": true,
+    "email": "yourself@example.com",
+    "name": "Your Name",
+    "lastAccuracy": 87
+  }'
+```
+
+PowerShell equivalent:
+
+```powershell
+$body = @{
+  test_mode    = $true
+  email        = 'yourself@example.com'
+  name         = 'Your Name'
+  lastAccuracy = 87
+} | ConvertTo-Json -Compress
+Invoke-RestMethod `
+  -Uri 'https://<project>.supabase.co/functions/v1/send-reminders' `
+  -Method POST `
+  -Headers @{ 'x-cron-secret' = '<secret>'; 'Content-Type' = 'application/json' } `
+  -Body $body
+```
+
+Response shape:
+
+```json
+{
+  "test_mode": true,
+  "results": [
+    { "subject": "Try your first passage, ...", "status": 200, "body": null },
+    { "subject": "87% last time, ... — push it higher?", "status": 200, "body": null }
+  ],
+  "linkError": null
+}
+```
+
+`linkError: "User with this email not found"` is normal when the target isn't a registered student — the activation template falls back to a generic `/reset-password` URL. The re-engagement template is unaffected.
 
 DNS records (live, for reference):
 - `resend._domainkey` TXT — DKIM public key (`p=MIGfMA0GCSqG...IDAQAB`)

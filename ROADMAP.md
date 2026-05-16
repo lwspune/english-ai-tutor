@@ -123,16 +123,46 @@ Track each student's modal reading hour (IST-localised from `sessions.created_at
 
 "Premium app feel" ships in three independent ~2-day blocks, each individually shippable. Don't roadmap "premium feel" as a single line item — it's a sensibility, not a feature, and framing it as one bucket guarantees it never feels done.
 
-- **E.A. Empty states + skeleton loading** — replace generic spinners with shaped skeleton blocks across `StudentHome`, `SessionReport`, `StudentProgress`, `VocabHome`, `TeacherDashboard`. Replace "no sessions yet" plain text with illustrated empty cards that suggest the next action.
+- **E.A. Empty states + skeleton loading** — *partial (2026-05-16).* "Needs Your Attention" empty states ("Everyone active ✓" / "Everyone onboarded ✓" / "No suspicious sessions ✓") shipped in Phase 2 of the teacher overhaul (commit `f56588f`). Still TODO: skeleton blocks (not just spinners) across `StudentHome`, `SessionReport`, `StudentProgress`, `VocabHome`, and the load states on the rest of `TeacherDashboard`. Illustrated empty cards on student-side surfaces still pending.
 - **E.B. First-time student onboarding** — 3 cards on first `StudentHome` visit: how to read aloud, how the AI scores, how the vocab + drill loops work. Skippable, auto-dismissed after view; localStorage flag (same pattern as `weekly_summary_seen_{studentId}`).
-- **E.C. Landing/marketing page** — `/` for unauthenticated visitors becomes a real page (currently just redirects to login). Parents browsing the URL should see the value prop. Copy + 2-3 illustrations + sign-in CTA.
+- **E.C. Landing/marketing page** — **✅ done 2026-05-13 (commit `f4cc4f2`); polish pass shipped 2026-05-16 (commit `66ee4fb`).** `/` for unauthenticated visitors now renders `LandingPage` — hero + trust strip + 4 feature cards + waitlist form + B2C Phase 0 trigger at 50 signups. The polish pass added: indigo book-glyph mark + sticky backdrop-blur header, soft radial-gradient hero bg, pulsing green-dot trust strip, icon-tiled feature cards with hover lift, indigo-50→white gradient CTA, fade-up motion. Active learning loop: see `memory/project_b2c_trial_validation.md` for the 6-week watch trigger to 2026-06-24.
 
 **Why this framing:** the engagement polish layer (sound, haptics, confetti, animations) shipped 2026-05-11 lifted the *moment-to-moment* feel. These three lift the *first-impression* and *unfamiliar-state* feel — where students drop off most.
 
 **What we'll learn (per sprint):**
 - E.A — whether students bounce less from empty / loading states. Compare bounce-from-empty rate (sessions where the student lands on a blank page and leaves within 10s) before/after.
 - E.B — first-time-student → second-session conversion. Currently unknown; baseline once the onboarding ships.
-- E.C — anonymous-to-signup conversion on the landing page (requires basic analytics; small lift acceptable since the parent-trust function alone justifies it).
+- E.C — *active*. Waitlist signup rate (`?src=<channel>` attribution captured per signup). Current state: 3 / 50 by 2026-06-24 with all 3 from launch day; channel test underway.
+
+### F. Anti-cheat hardening v2 — gated on confirmed-cheat frequency
+
+Deferred at v1 ship time (2026-05-16). The v1 outlier-flag chip (`src/lib/anomalyFlag.js` + `StudentDetail` amber chip) is the only anti-cheat surface today and is intentionally a *heuristic UI hint*, not server-side enforcement. Confirmed cheat count at v1 ship: n=1 (Gurusai, see `memory/project_cheating_first_confirmed.md`).
+
+**Why now-on-the-roadmap-but-not-yet-built:** the v1 chip catches the accuracy-shape pattern (sudden 100% in a student's history). It does NOT catch the harder cases: in-trend TTS reads (student plays a TTS that scores similar to their own average → no spike to flag), voice changes between sessions, or single-session first-attempts where no baseline exists.
+
+**Tiered escalation, in cost order:**
+1. **Trend-anomaly flag on the dashboard** — surface every outlier across the class on `/teacher`, not just per-student. *Partially shipped 2026-05-16 as the "Outlier sessions" sub-section in the Needs Your Attention card.* Done.
+2. **Liveness via random-word insertion** — passage rendering prepends a 1-word challenge ("read the colour BLUE then begin") that rotates per attempt. TTS pipelines won't include the perturbation; humans will. ~1 day. The right next step *if cheating frequency justifies it*.
+3. **Voice-fingerprint comparison** — store a low-dim embedding per student from their first 3 sessions; flag sessions whose embedding diverges. ~1 week (model integration + storage). Higher cost; only if liveness leaks.
+
+**Trigger:** ≥5 confirmed cheats in 30 days OR a teacher report that liveness would have caught something. Until then, the v1 chip is the right floor.
+
+**What we'll learn:** whether cheating scales linearly with student count or stays concentrated to a few individuals. Concentrated = teacher conversation suffices; scaling = build liveness.
+
+### G. Teacher pages premium polish — remaining surfaces (deferred 2026-05-16)
+
+Phase 3b of the teacher overhaul (commit `3a70bdc`) applied the polish pass to `/teacher` and `/teacher/student/:id` only. The same treatment (`text-3xl tracking-tight` numbers, `shadow-sm hover:shadow hover:-translate-y-0.5` on cards, `text-lg font-semibold tracking-tight` section headings, uppercase tracking-wide chip labels) is NOT yet applied to:
+
+- `/teacher/passages` (`PassageManager`) — the most-used teacher CRUD surface
+- `/teacher/audio-review` — recently shipped; visual treatment is functional but not polished
+- `/teacher/waitlist` — same
+- `/teacher/completion` — same
+
+**Why deferred:** the user explicitly stopped Phase 3 at the polish-of-most-used-pages mark and wanted real-use feedback before continuing. Polish without usage is guessing.
+
+**First step:** pick one teacher page that's actively bothering you (probably PassageManager since it's used daily). Apply the same 3-move recipe used in Phase 3b: heading hierarchy, shadow-sm + hover-lift on cards, tracking-tight on numbers.
+
+**What we'll learn:** whether the polish ratio holds (each ~30 min CSS pass produces a visible lift) or whether the dashboard already absorbed the polish that mattered. If you don't miss the polish on the deferred pages after a week, the work isn't earning its cost.
 
 ## Deliberately skipped
 

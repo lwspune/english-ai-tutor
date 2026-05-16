@@ -6,6 +6,7 @@ import { MetricCard } from '../../components/PerformanceCharts'
 import { WPM_TARGETS } from '../../lib/wpmTargets'
 import { computeSessionCost, formatCost } from '../../lib/costUtils'
 import { isOutlierSession } from '../../lib/anomalyFlag'
+import { extractEdgeFunctionError } from '../../lib/edgeFunctionError'
 
 function trend(current, previous) {
   if (previous == null) return null
@@ -84,7 +85,8 @@ function ResetPasswordModal({ studentId, onClose }) {
     })
     setSubmitting(false)
     if (fnError || !data?.success) {
-      setError(fnError?.message ?? data?.error ?? 'Reset failed')
+      const fromBody = fnError ? await extractEdgeFunctionError(fnError) : null
+      setError(fromBody || data?.error || 'Reset failed')
       return
     }
     onClose(true)

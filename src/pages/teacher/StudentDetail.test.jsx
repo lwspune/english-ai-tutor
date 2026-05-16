@@ -204,8 +204,18 @@ describe('StudentDetail — reset password', () => {
     await waitFor(() => expect(screen.getByText(/password updated/i)).toBeInTheDocument())
   })
 
-  it('shows error message when reset fails', async () => {
-    mockInvoke.mockResolvedValue({ data: null, error: { message: 'Student not found' } })
+  it('surfaces the actual function error from the response body, not the generic FunctionsHttpError message', async () => {
+    // Real Supabase FunctionsHttpError shape: .message is a generic
+    // "Edge function returned a non-2xx status code" string; the actual
+    // error text lives in .context.json().error. The handler should read
+    // the body via extractEdgeFunctionError, not just .message.
+    mockInvoke.mockResolvedValue({
+      data: null,
+      error: {
+        message: 'Edge function returned a non-2xx status code',
+        context: { json: async () => ({ error: 'Student not found' }) },
+      },
+    })
     const user = userEvent.setup()
     await waitForLoad()
 
@@ -214,6 +224,24 @@ describe('StudentDetail — reset password', () => {
     await user.click(screen.getByRole('button', { name: /^confirm/i }))
 
     await waitFor(() => expect(screen.getByText(/student not found/i)).toBeInTheDocument())
+    // The generic Supabase wrapper text must NOT be what the teacher sees.
+    expect(screen.queryByText(/non-2xx/i)).not.toBeInTheDocument()
+  })
+
+  it('falls back to "Reset failed" when neither fnError nor data.error has usable text', async () => {
+    // Defensive case: pathological response where everything is missing.
+    mockInvoke.mockResolvedValue({
+      data: null,
+      error: { message: '', context: { json: async () => ({}) } },
+    })
+    const user = userEvent.setup()
+    await waitForLoad()
+
+    await user.click(screen.getByRole('button', { name: /reset password/i }))
+    await user.type(screen.getByLabelText(/new password/i), 'newpassword1')
+    await user.click(screen.getByRole('button', { name: /^confirm/i }))
+
+    await waitFor(() => expect(screen.getByText(/reset failed/i)).toBeInTheDocument())
   })
 
   it('closes the modal when Cancel is clicked', async () => {

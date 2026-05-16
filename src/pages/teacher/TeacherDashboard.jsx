@@ -19,6 +19,9 @@ export default function TeacherDashboard() {
   const [showAddStudent, setShowAddStudent] = useState(false)
   const [studentFetchTrigger, setStudentFetchTrigger] = useState(0)
   const [classVocabMastery, setClassVocabMastery] = useState(null)
+  const [vocabByStudent, setVocabByStudent] = useState({})
+  const [totalVocabWords, setTotalVocabWords] = useState(0)
+  const [milestonesByStudent, setMilestonesByStudent] = useState({})
 
   function copyCode() {
     navigator.clipboard.writeText(classCode)
@@ -109,6 +112,8 @@ export default function TeacherDashboard() {
       const eligibleIds = students.map(s => s.id)
       if (!eligibleIds.length) {
         setClassVocabMastery(null)
+        setVocabByStudent({})
+        setTotalVocabWords(0)
         return
       }
       const { count: totalWords } = await supabase
@@ -119,6 +124,13 @@ export default function TeacherDashboard() {
         .select('student_id, mastered_at')
         .in('student_id', eligibleIds)
       const masteredCount = (progressRows ?? []).filter(r => r.mastered_at).length
+      const byStudent = {}
+      for (const r of progressRows ?? []) {
+        if (!byStudent[r.student_id]) byStudent[r.student_id] = 0
+        if (r.mastered_at) byStudent[r.student_id]++
+      }
+      setVocabByStudent(byStudent)
+      setTotalVocabWords(totalWords ?? 0)
       if (!totalWords) {
         setClassVocabMastery(null)
         return
@@ -126,6 +138,26 @@ export default function TeacherDashboard() {
       setClassVocabMastery(Math.round(100 * masteredCount / (eligibleIds.length * totalWords)))
     }
     if (students.length > 0) loadVocabStats()
+  }, [students])
+
+  useEffect(() => {
+    async function loadMilestones() {
+      const eligibleIds = students.map(s => s.id)
+      if (!eligibleIds.length) {
+        setMilestonesByStudent({})
+        return
+      }
+      const { data: milestoneRows } = await supabase
+        .from('milestones')
+        .select('student_id')
+        .in('student_id', eligibleIds)
+      const byStudent = {}
+      for (const m of milestoneRows ?? []) {
+        byStudent[m.student_id] = (byStudent[m.student_id] ?? 0) + 1
+      }
+      setMilestonesByStudent(byStudent)
+    }
+    if (students.length > 0) loadMilestones()
   }, [students])
 
   function handleModalClose(didAdd) {
@@ -246,45 +278,60 @@ export default function TeacherDashboard() {
                 </div>
               </div>
 
-              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-100 bg-slate-50">
                       <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Student</th>
-                      <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Sessions</th>
-                      <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Avg Accuracy</th>
-                      <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Avg WPM</th>
-                      <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Last Session</th>
-                      <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Cost</th>
+                      <th className="text-center px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Sessions</th>
+                      <th className="text-center px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Avg Accuracy</th>
+                      <th className="text-center px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Avg WPM</th>
+                      <th className="text-center px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Vocab</th>
+                      <th className="text-center px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Milestones</th>
+                      <th className="text-center px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Last Session</th>
+                      <th className="text-center px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Cost</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {students.map((s, i) => (
+                    {students.map((s, i) => {
+                      const vocabMastered = vocabByStudent[s.id] ?? 0
+                      const milestoneCount = milestonesByStudent[s.id] ?? 0
+                      return (
                       <tr
                         key={s.id}
                         onClick={() => navigate(`/teacher/student/${s.id}`)}
                         className={`cursor-pointer hover:bg-indigo-50 transition-colors ${i < students.length - 1 ? 'border-b border-slate-100' : ''}`}
                       >
-                        <td className="px-4 py-3 font-medium text-slate-800">{s.full_name}
+                        <td className="px-4 py-3 font-medium text-slate-800 whitespace-nowrap">{s.full_name}
                           <span className="ml-2 text-xs text-slate-400">{s.grade === 'MBA' ? 'MBA' : `Grade ${s.grade}`}</span>
                         </td>
-                        <td className="px-4 py-3 text-center text-slate-600">{s.sessions}</td>
-                        <td className="px-4 py-3 text-center">
+                        <td className="px-3 py-3 text-center text-slate-600">{s.sessions}</td>
+                        <td className="px-3 py-3 text-center">
                           {s.avgAccuracy !== null ? (
                             <span className={`font-semibold ${s.avgAccuracy >= 80 ? 'text-green-600' : s.avgAccuracy >= 60 ? 'text-yellow-600' : 'text-red-500'}`}>
                               {s.avgAccuracy}%
                             </span>
                           ) : <span className="text-slate-300">—</span>}
                         </td>
-                        <td className="px-4 py-3 text-center text-slate-600">{s.avgWpm ?? <span className="text-slate-300">—</span>}</td>
-                        <td className="px-4 py-3 text-center text-slate-400 text-xs">
+                        <td className="px-3 py-3 text-center text-slate-600">{s.avgWpm ?? <span className="text-slate-300">—</span>}</td>
+                        <td data-testid={`vocab-cell-${s.id}`} className="px-3 py-3 text-center text-slate-600 whitespace-nowrap">
+                          {totalVocabWords > 0
+                            ? <span className={vocabMastered > 0 ? 'text-slate-700 font-medium' : 'text-slate-400'}>{vocabMastered} / {totalVocabWords}</span>
+                            : <span className="text-slate-300">—</span>}
+                        </td>
+                        <td data-testid={`milestones-cell-${s.id}`} className="px-3 py-3 text-center">
+                          {milestoneCount > 0
+                            ? <span className="text-indigo-600 font-semibold">{milestoneCount}</span>
+                            : <span className="text-slate-300">0</span>}
+                        </td>
+                        <td className="px-3 py-3 text-center text-slate-400 text-xs whitespace-nowrap">
                           {s.lastSession ? new Date(s.lastSession).toLocaleDateString() : '—'}
                         </td>
-                        <td className="px-4 py-3 text-center text-xs font-mono text-slate-600">
+                        <td className="px-3 py-3 text-center text-xs font-mono text-slate-600 whitespace-nowrap">
                           {formatCost(s.totalCost)}
                         </td>
                       </tr>
-                    ))}
+                    )})}
                   </tbody>
                 </table>
               </div>

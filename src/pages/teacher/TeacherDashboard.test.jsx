@@ -73,7 +73,31 @@ vi.mock('../../lib/supabase', () => ({
       if (table === 'student_word_progress') {
         return {
           select: () => ({
-            in: () => Promise.resolve({ data: [], error: null }),
+            in: () => Promise.resolve({
+              data: [
+                { student_id: 'student-1', mastered_at: '2026-04-15T00:00:00Z' },
+                { student_id: 'student-1', mastered_at: '2026-04-20T00:00:00Z' },
+                { student_id: 'student-1', mastered_at: null },
+              ],
+              error: null,
+            }),
+          }),
+        }
+      }
+      if (table === 'milestones') {
+        return {
+          select: () => ({
+            in: () => Promise.resolve({
+              // 5 milestones for student-1
+              data: [
+                { student_id: 'student-1', kind: 'comprehension_aced' },
+                { student_id: 'student-1', kind: 'comprehension_aced' },
+                { student_id: 'student-1', kind: 'personal_best_accuracy' },
+                { student_id: 'student-1', kind: 'word_mastered' },
+                { student_id: 'student-1', kind: 'word_mastered' },
+              ],
+              error: null,
+            }),
           }),
         }
       }
@@ -198,10 +222,36 @@ describe('TeacherDashboard — summary stat chips', () => {
 
   it('shows class-wide vocab mastery chip (now ungated by grade)', async () => {
     render(<TeacherDashboard />)
+    // Wait for the vocab fetch to resolve and update the chip — the
+    // student list loads first, but the vocab effect runs after.
+    await waitFor(() => expect(screen.getByTestId('stat-vocab')).toHaveTextContent('20%'))
+    expect(screen.getByTestId('stat-vocab')).toHaveTextContent(/vocab mastery/i)
+  })
+})
+
+// ─── Per-student vocab + milestone columns (Phase 1 visibility) ───────────────
+
+describe('TeacherDashboard — per-student vocab + milestones columns', () => {
+  it('renders a Vocab column header', async () => {
+    render(<TeacherDashboard />)
     await waitFor(() => screen.getByText('Aarav Shah'))
-    const chip = screen.getByTestId('stat-vocab')
-    // grade-10 student is now eligible. 0 mastered of 10 total → 0%.
-    expect(chip).toHaveTextContent('0%')
-    expect(chip).toHaveTextContent(/vocab mastery/i)
+    expect(screen.getByRole('columnheader', { name: /vocab/i })).toBeInTheDocument()
+  })
+
+  it('shows per-student mastered count + total in the row', async () => {
+    render(<TeacherDashboard />)
+    // Vocab data fetches after student list — wait for the cell to populate.
+    await waitFor(() => expect(screen.getByTestId('vocab-cell-student-1')).toHaveTextContent('2 / 10'))
+  })
+
+  it('renders a Milestones column header', async () => {
+    render(<TeacherDashboard />)
+    await waitFor(() => screen.getByText('Aarav Shah'))
+    expect(screen.getByRole('columnheader', { name: /milestones/i })).toBeInTheDocument()
+  })
+
+  it('shows per-student milestones count in the row', async () => {
+    render(<TeacherDashboard />)
+    await waitFor(() => expect(screen.getByTestId('milestones-cell-student-1')).toHaveTextContent('5'))
   })
 })

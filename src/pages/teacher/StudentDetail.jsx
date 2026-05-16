@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { computeAvgComprehension } from '../../lib/studentStats'
@@ -154,24 +154,63 @@ export default function StudentDetail() {
   const navigate = useNavigate()
   const [student, setStudent] = useState(null)
   const [sessions, setSessions] = useState([])
+  const [vocabProgress, setVocabProgress] = useState([])
+  const [totalVocab, setTotalVocab] = useState(0)
+  const [drillAttempts, setDrillAttempts] = useState([])
   const [openFeedbackId, setOpenFeedbackId] = useState(null)
   const [showResetPassword, setShowResetPassword] = useState(false)
   const [passwordResetSuccess, setPasswordResetSuccess] = useState(false)
+  // Capture "now" at mount so useMemo stays pure (no Date.now() in render path).
+  // Teacher view doesn't auto-refresh; one timestamp per visit is correct.
+  const [loadedAt] = useState(() => Date.now())
 
   useEffect(() => {
     async function load() {
-      const [{ data: p }, { data: s }] = await Promise.all([
+      const [{ data: p }, { data: s }, { data: vp }, { count: vc }, { data: da }] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', studentId).single(),
         supabase.from('sessions')
           .select('*, passages(title)')
           .eq('student_id', studentId)
           .order('created_at', { ascending: true }),
+        supabase.from('student_word_progress').select('*').eq('student_id', studentId),
+        supabase.from('vocabulary_words').select('*', { count: 'exact', head: true }),
+        supabase.from('drill_attempts')
+          .select('*')
+          .eq('student_id', studentId)
+          .order('created_at', { ascending: false }),
       ])
       setStudent(p)
       setSessions(s ?? [])
+      setVocabProgress(vp ?? [])
+      setTotalVocab(vc ?? 0)
+      setDrillAttempts(da ?? [])
     }
     load()
   }, [studentId])
+
+  // Vocab + drill aggregates — computed in useMemo so Date.now() is only
+  // captured when data changes, not every render. Hooks must come BEFORE
+  // any early return (React rules).
+  const vocabStats = useMemo(() => {
+    if (totalVocab === 0) return null
+    return {
+      mastered: vocabProgress.filter(w => w.mastered_at).length,
+      inProgress: vocabProgress.filter(w => !w.mastered_at).length,
+      dueNow: vocabProgress.filter(w => !w.mastered_at && new Date(w.next_review_at).getTime() <= loadedAt).length,
+      fromReading: vocabProgress.filter(w => w.last_encounter_source === 'reading').length,
+      masteryPct: (vocabProgress.filter(w => w.mastered_at).length / totalVocab) * 100,
+    }
+  }, [vocabProgress, totalVocab, loadedAt])
+
+  const drillStats = useMemo(() => {
+    if (drillAttempts.length === 0) return null
+    const correctCount = drillAttempts.filter(a => a.was_correct).length
+    return {
+      attempts: drillAttempts.length,
+      distinctWords: new Set(drillAttempts.map(a => a.stumble_word)).size,
+      correctRate: Math.round((correctCount / drillAttempts.length) * 100),
+    }
+  }, [drillAttempts])
 
   if (!student) {
     return (
@@ -324,6 +363,93 @@ export default function StudentDetail() {
             <p className="text-xs text-amber-700 mt-3">
               These words were mispronounced or skipped in 2 or more sessions. Suggest the student practise them before the next passage.
             </p>
+          </div>
+        )}
+
+        {/* Vocab progress */}
+        {vocabStats && (
+          <div>
+            <h2 className="text-base font-semibold text-slate-700 mb-3">Vocab Progress</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
+                <p data-testid="vocab-stat-mastered" className="text-2xl font-bold text-slate-800">{vocabStats.mastered}</p>
+                <p className="text-xs text-slate-500 mt-1">Mastered</p>
+                <p className="text-xs text-slate-400 mt-0.5">of {totalVocab}</p>
+              </div>
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
+                <p data-testid="vocab-stat-in-progress" className="text-2xl font-bold text-slate-800">{vocabStats.inProgress}</p>
+                <p className="text-xs text-slate-500 mt-1">In Progress</p>
+              </div>
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
+                <p data-testid="vocab-stat-due-now" className={`text-2xl font-bold ${vocabStats.dueNow > 0 ? 'text-amber-600' : 'text-slate-800'}`}>{vocabStats.dueNow}</p>
+                <p className="text-xs text-slate-500 mt-1">Due Now</p>
+              </div>
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
+                <p data-testid="vocab-stat-from-reading" className="text-2xl font-bold text-slate-800">{vocabStats.fromReading}</p>
+                <p className="text-xs text-slate-500 mt-1">From Reading</p>
+              </div>
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-200 p-4">
+              <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
+                <span>Mastery</span>
+                <span>{vocabStats.mastered} / {totalVocab}</span>
+              </div>
+              <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-indigo-500 transition-all"
+                  style={{ width: `${vocabStats.masteryPct}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Drill activity */}
+        {drillStats && (
+          <div>
+            <h2 className="text-base font-semibold text-slate-700 mb-3">Drill Activity</h2>
+            <div className="grid grid-cols-3 gap-3 mb-3">
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
+                <p data-testid="drill-stat-attempts" className="text-2xl font-bold text-slate-800">{drillStats.attempts}</p>
+                <p className="text-xs text-slate-500 mt-1">Attempts</p>
+              </div>
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
+                <p data-testid="drill-stat-distinct-words" className="text-2xl font-bold text-slate-800">{drillStats.distinctWords}</p>
+                <p className="text-xs text-slate-500 mt-1">Distinct Words</p>
+              </div>
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
+                <p data-testid="drill-stat-correct-rate" className={`text-2xl font-bold ${drillStats.correctRate >= 60 ? 'text-green-600' : drillStats.correctRate >= 40 ? 'text-yellow-600' : 'text-red-500'}`}>{drillStats.correctRate}%</p>
+                <p className="text-xs text-slate-500 mt-1">Correct</p>
+              </div>
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50">
+                    <th className="text-left px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">Word</th>
+                    <th className="text-center px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">Result</th>
+                    <th className="text-center px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">Attempt</th>
+                    <th className="text-center px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {drillAttempts.map((a, i) => (
+                    <tr key={a.id} className={i < drillAttempts.length - 1 ? 'border-b border-slate-100' : ''}>
+                      <td className="px-3 py-2 font-medium text-slate-800">{a.stumble_word}</td>
+                      <td className="px-3 py-2 text-center">
+                        {a.was_correct ? (
+                          <span className="text-green-600 font-semibold" aria-label="correct">✓</span>
+                        ) : (
+                          <span className="text-red-500 font-semibold" aria-label="incorrect">✗</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-center text-slate-500 text-xs">{a.attempt_index}/3</td>
+                      <td className="px-3 py-2 text-center text-slate-400 text-xs">{new Date(a.created_at).toLocaleDateString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 

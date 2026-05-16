@@ -28,6 +28,23 @@ const AI_FEEDBACK = JSON.stringify({
 
 const RULE_FEEDBACK = 'You substituted 3 words. Focus on reading each word carefully.'
 
+// Vocab + drill fixtures (Phase 1 — teacher visibility into student vocab and drills)
+const STUDENT_VOCAB_PROGRESS = [
+  // 2 mastered (1 via practice, 1 via reading-encounter)
+  { word_id: 'w-1', srs_box: 5, correct_count: 4, mastered_at: '2026-04-15T00:00:00Z', next_review_at: '2026-05-15T00:00:00Z', total_encounters: 8, last_encounter_source: 'practice' },
+  { word_id: 'w-2', srs_box: 5, correct_count: 3, mastered_at: '2026-04-20T00:00:00Z', next_review_at: '2026-05-20T00:00:00Z', total_encounters: 6, last_encounter_source: 'reading' },
+  // 2 in-progress (1 due now — next_review_at in past; 1 future)
+  { word_id: 'w-3', srs_box: 2, correct_count: 1, mastered_at: null, next_review_at: '2026-04-01T00:00:00Z', total_encounters: 3, last_encounter_source: 'practice' },
+  { word_id: 'w-4', srs_box: 3, correct_count: 2, mastered_at: null, next_review_at: '2030-06-01T00:00:00Z', total_encounters: 4, last_encounter_source: 'reading' },
+]
+const TOTAL_VOCAB_WORDS = 100
+
+const STUDENT_DRILL_ATTEMPTS = [
+  { id: 'd-1', stumble_word: 'therefore', sentence: 'Therefore we must act.', score: 100, was_correct: true, attempt_index: 1, created_at: '2026-04-25T10:00:00Z' },
+  { id: 'd-2', stumble_word: 'consequently', sentence: 'Consequently they failed.', score: 0, was_correct: false, attempt_index: 1, created_at: '2026-04-26T10:00:00Z' },
+  { id: 'd-3', stumble_word: 'therefore', sentence: 'Therefore we must act.', score: 100, was_correct: true, attempt_index: 2, created_at: '2026-04-27T10:00:00Z' },
+]
+
 vi.mock('../../lib/supabase', () => ({
   supabase: {
     from: (table) => {
@@ -36,6 +53,27 @@ vi.mock('../../lib/supabase', () => ({
           select: () => ({
             eq: () => ({
               single: () => Promise.resolve({ data: { id: 'student-1', full_name: 'Aarav Shah', grade: '12' } }),
+            }),
+          }),
+        }
+      }
+      if (table === 'student_word_progress') {
+        return {
+          select: () => ({
+            eq: () => Promise.resolve({ data: STUDENT_VOCAB_PROGRESS, error: null }),
+          }),
+        }
+      }
+      if (table === 'vocabulary_words') {
+        return {
+          select: () => Promise.resolve({ count: TOTAL_VOCAB_WORDS, error: null, data: null }),
+        }
+      }
+      if (table === 'drill_attempts') {
+        return {
+          select: () => ({
+            eq: () => ({
+              order: () => Promise.resolve({ data: STUDENT_DRILL_ATTEMPTS, error: null }),
             }),
           }),
         }
@@ -257,6 +295,75 @@ describe('StudentDetail — reset password', () => {
 })
 
 // ─── Cost column ──────────────────────────────────────────────────────────────
+
+// ─── Vocab progress (Phase 1 teacher visibility) ──────────────────────────────
+
+describe('StudentDetail — vocab progress', () => {
+  it('renders the Vocab Progress section with the section heading', async () => {
+    render(<StudentDetail />)
+    await waitFor(() => screen.getByText(/vocab progress/i))
+    expect(screen.getByText(/vocab progress/i)).toBeInTheDocument()
+  })
+
+  it('shows mastered count and total NDA-list words', async () => {
+    render(<StudentDetail />)
+    await waitFor(() => screen.getByTestId('vocab-stat-mastered'))
+    // 2 of the 4 progress rows have mastered_at set
+    expect(screen.getByTestId('vocab-stat-mastered')).toHaveTextContent('2')
+    // Total NDA-list words from the mock = 100
+    expect(screen.getByText(/of 100/i)).toBeInTheDocument()
+  })
+
+  it('shows in-progress count (mastered_at IS NULL)', async () => {
+    render(<StudentDetail />)
+    await waitFor(() => screen.getByTestId('vocab-stat-in-progress'))
+    // 2 unmastered (w-3, w-4)
+    expect(screen.getByTestId('vocab-stat-in-progress')).toHaveTextContent('2')
+  })
+
+  it('shows due-now count (unmastered AND next_review_at <= now)', async () => {
+    render(<StudentDetail />)
+    await waitFor(() => screen.getByTestId('vocab-stat-due-now'))
+    // Only w-3 has next_review_at in the past
+    expect(screen.getByTestId('vocab-stat-due-now')).toHaveTextContent('1')
+  })
+
+  it('shows from-reading count (last_encounter_source = reading)', async () => {
+    render(<StudentDetail />)
+    await waitFor(() => screen.getByTestId('vocab-stat-from-reading'))
+    // w-2 (mastered via reading) + w-4 (in-progress via reading) = 2
+    expect(screen.getByTestId('vocab-stat-from-reading')).toHaveTextContent('2')
+  })
+})
+
+// ─── Drill activity (Phase 1 teacher visibility) ──────────────────────────────
+
+describe('StudentDetail — drill activity', () => {
+  it('renders the Drill Activity section heading', async () => {
+    render(<StudentDetail />)
+    await waitFor(() => screen.getByText(/drill activity/i))
+    expect(screen.getByText(/drill activity/i)).toBeInTheDocument()
+  })
+
+  it('shows total attempts, distinct stumble words, and correct-rate stats', async () => {
+    render(<StudentDetail />)
+    await waitFor(() => screen.getByTestId('drill-stat-attempts'))
+    // 3 attempts total
+    expect(screen.getByTestId('drill-stat-attempts')).toHaveTextContent('3')
+    // 2 distinct stumble words (therefore, consequently)
+    expect(screen.getByTestId('drill-stat-distinct-words')).toHaveTextContent('2')
+    // 2 of 3 correct = 67%
+    expect(screen.getByTestId('drill-stat-correct-rate')).toHaveTextContent('67%')
+  })
+
+  it('lists recent drill attempts with word + result', async () => {
+    render(<StudentDetail />)
+    await waitFor(() => screen.getByText(/drill activity/i))
+    // Words rendered in the attempt list
+    expect(screen.getAllByText('therefore').length).toBeGreaterThan(0)
+    expect(screen.getByText('consequently')).toBeInTheDocument()
+  })
+})
 
 // ─── Outlier flag ─────────────────────────────────────────────────────────────
 

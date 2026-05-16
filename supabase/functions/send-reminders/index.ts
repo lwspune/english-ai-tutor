@@ -54,6 +54,39 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: 'RESEND_API_KEY not set' }), { status: 500 })
   }
 
+  // test_mode bypasses cohort selection and sends one of each template to a
+  // single target email — for verifying copy/deliverability without waiting
+  // for the next cron run. Same cron_secret auth above.
+  let body: any = {}
+  try { body = await req.json() } catch { /* GET / empty body — cron path */ }
+  if (body?.test_mode === true) {
+    if (!body.email || typeof body.email !== 'string') {
+      return new Response(JSON.stringify({ error: 'test_mode requires { email }' }), { status: 400 })
+    }
+    const testName = body.name ?? 'Test Student'
+    const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
+      type: 'recovery',
+      email: body.email,
+      options: { redirectTo: RESET_URL },
+    })
+    const actionLink = linkData?.properties?.action_link ?? `${SITE_URL}/reset-password`
+    const previews = [
+      buildActivationEmail(testName, body.email, actionLink),
+      buildReengagementEmail(testName, body.email, body.lastAccuracy ?? 87),
+    ]
+    const results: any[] = []
+    for (const payload of previews) {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      results.push({ subject: payload.subject, status: res.status, body: res.ok ? null : await res.text() })
+    }
+    return new Response(JSON.stringify({ test_mode: true, results, linkError: linkError?.message ?? null }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } })
+  }
+
   const now = Date.now()
   const [{ data: { users } }, { data: profiles }, { data: sessions }] = await Promise.all([
     adminClient.auth.admin.listUsers({ perPage: 1000 }),
@@ -122,43 +155,76 @@ Deno.serve(async (req) => {
 })
 
 function buildActivationEmail(name: string, email: string, actionLink: string) {
+  const text = `Hi ${name},
+
+This is the reading practice tool your batch is using in Pune. Your account
+is set up — log in once to set your password, then try a short passage.
+
+Each session takes 2-3 minutes. You read a passage aloud, the app scores
+your accuracy and pronunciation, and tells you what to fix next time.
+
+Try your first passage (link valid for 1 hour):
+${actionLink}
+
+-- English AI Tutor, LWS Pune
+Login email: ${email}
+Reply to this email if you can't log in.`
+
   return {
     from: FROM_EMAIL,
     to: email,
-    subject: 'Your English AI Tutor account is ready — set your password',
-    html: `
-      <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
-        <h2 style="color:#1e293b">Hi ${name},</h2>
-        <p style="color:#475569">Your English AI Tutor account has been set up for you.</p>
-        <p style="color:#475569">Click the button below to set your password and start practising. The link is valid for 1 hour.</p>
-        <a href="${actionLink}" style="display:inline-block;background:#4f46e5;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin:8px 0">
-          Set Password &amp; Start →
-        </a>
-        <p style="color:#94a3b8;font-size:12px;margin-top:24px">Login email: ${email}</p>
-        <p style="color:#94a3b8;font-size:12px">English AI Tutor · LWS Pune</p>
-      </div>
-    `,
+    subject: `Try your first passage, ${name} — 2 minutes`,
+    text,
+    html: `<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;color:#334155;line-height:1.55">
+  <p>Hi ${name},</p>
+  <p>This is the reading practice tool your batch is using in Pune. Your account is set up — log in once to set your password, then try a short passage.</p>
+  <p>Each session takes 2–3 minutes. You read a passage aloud, the app scores your accuracy and pronunciation, and tells you what to fix next time.</p>
+  <p style="margin:20px 0">
+    <a href="${actionLink}" style="background:#4f46e5;color:#ffffff;padding:11px 22px;border-radius:6px;text-decoration:none;font-weight:600;display:inline-block">Try your first passage</a>
+  </p>
+  <p style="color:#64748b;font-size:13px">Link is valid for 1 hour.</p>
+  <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0">
+  <p style="color:#64748b;font-size:12px;margin:4px 0">English AI Tutor · LWS Pune</p>
+  <p style="color:#64748b;font-size:12px;margin:4px 0">Login email: ${email}</p>
+  <p style="color:#64748b;font-size:12px;margin:4px 0">Reply to this email if you can't log in.</p>
+</div>`,
   }
 }
 
 function buildReengagementEmail(name: string, email: string, lastAccuracy?: number) {
-  const accuracyLine = lastAccuracy != null
-    ? `<p style="color:#475569">Your last session accuracy was <strong>${lastAccuracy}%</strong> — keep the momentum going.</p>`
-    : ''
+  const hasScore = lastAccuracy != null
+  const subject = hasScore
+    ? `${lastAccuracy}% last time, ${name} — push it higher?`
+    : `A new passage is waiting, ${name}`
+  const scoreLine = hasScore
+    ? `Your last reading session scored ${lastAccuracy}%.`
+    : `It's been a few days since your last reading session.`
+
+  const text = `Hi ${name},
+
+${scoreLine}
+
+A new passage takes 2-3 minutes. Try one today:
+${SITE_URL}
+
+-- English AI Tutor, LWS Pune
+Reply to this email if you need help.`
+
   return {
     from: FROM_EMAIL,
     to: email,
-    subject: 'Your reading practice is waiting',
-    html: `
-      <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
-        <h2 style="color:#1e293b">Hi ${name},</h2>
-        <p style="color:#475569">It's been a few days since your last reading session.</p>
-        ${accuracyLine}
-        <a href="${SITE_URL}" style="display:inline-block;background:#4f46e5;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin:8px 0">
-          Continue Practising →
-        </a>
-        <p style="color:#94a3b8;font-size:12px;margin-top:24px">English AI Tutor · LWS Pune</p>
-      </div>
-    `,
+    subject,
+    text,
+    html: `<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;color:#334155;line-height:1.55">
+  <p>Hi ${name},</p>
+  <p>${scoreLine}</p>
+  <p>A new passage takes 2–3 minutes.</p>
+  <p style="margin:20px 0">
+    <a href="${SITE_URL}" style="background:#4f46e5;color:#ffffff;padding:11px 22px;border-radius:6px;text-decoration:none;font-weight:600;display:inline-block">Try a new passage</a>
+  </p>
+  <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0">
+  <p style="color:#64748b;font-size:12px;margin:4px 0">English AI Tutor · LWS Pune</p>
+  <p style="color:#64748b;font-size:12px;margin:4px 0">Reply to this email if you need help.</p>
+</div>`,
   }
 }

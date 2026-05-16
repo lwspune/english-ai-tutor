@@ -5,6 +5,7 @@ import { computeAvgComprehension } from '../../lib/studentStats'
 import { MetricCard } from '../../components/PerformanceCharts'
 import { WPM_TARGETS } from '../../lib/wpmTargets'
 import { computeSessionCost, formatCost } from '../../lib/costUtils'
+import { isOutlierSession } from '../../lib/anomalyFlag'
 
 function trend(current, previous) {
   if (previous == null) return null
@@ -355,12 +356,24 @@ export default function StudentDetail() {
                     const wpmColor = Math.abs(s.score_wpm - wpmTarget) <= 15
                       ? 'text-green-600'
                       : s.score_wpm < wpmTarget ? 'text-yellow-600' : 'text-indigo-600'
+                    const { outlier, reason } = isOutlierSession(s, sessions)
 
                     return (
                       <React.Fragment key={s.id}>
                       <tr className={i < sessions.length - 1 ? 'border-b border-slate-100' : ''}>
                         <td className="px-3 py-3 text-slate-400 text-xs">{i + 1}</td>
-                        <td className="px-3 py-3 text-slate-800 max-w-[120px] truncate">{s.passages?.title}</td>
+                        <td className="px-3 py-3 text-slate-800 max-w-[180px]">
+                          <span className="block truncate">{s.passages?.title}</span>
+                          {outlier && (
+                            <span
+                              title={reason}
+                              data-testid={`outlier-flag-${s.id}`}
+                              className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900"
+                            >
+                              Outlier — review
+                            </span>
+                          )}
+                        </td>
                         <td className="px-3 py-3 text-slate-500 text-xs whitespace-nowrap">
                           {new Date(s.created_at).toLocaleDateString()}
                         </td>

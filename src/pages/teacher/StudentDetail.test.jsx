@@ -66,6 +66,26 @@ vi.mock('../../lib/supabase', () => ({
                     // old session — no cost data
                     whisper_duration_seconds: null, llm_input_tokens: null, llm_output_tokens: null,
                   },
+                  {
+                    // Low-score session — drives down the "other" mean so sess-4 trips outlier
+                    id: 'sess-3', created_at: '2026-04-03T10:00:00Z',
+                    score_accuracy: 50, score_wpm: 80, score_phrasing: 40, score_fluency: 40,
+                    count_omissions: 15, count_substitutions: 10,
+                    score_comprehension: null, comprehension_answers: null,
+                    word_results: [], feedback: null,
+                    passages: { title: 'A Difficult Read' },
+                    whisper_duration_seconds: null, llm_input_tokens: null, llm_output_tokens: null,
+                  },
+                  {
+                    // The outlier: acc=100, others mean (85+90+50)/3 = 75, gap = 25 → flagged
+                    id: 'sess-4', created_at: '2026-04-04T10:00:00Z',
+                    score_accuracy: 100, score_wpm: 150, score_phrasing: 100, score_fluency: 100,
+                    count_omissions: 0, count_substitutions: 0,
+                    score_comprehension: null, comprehension_answers: null,
+                    word_results: [], feedback: null,
+                    passages: { title: 'Suspiciously Perfect' },
+                    whisper_duration_seconds: null, llm_input_tokens: null, llm_output_tokens: null,
+                  },
                 ],
               }),
             }),
@@ -205,6 +225,35 @@ describe('StudentDetail — reset password', () => {
 
     await user.click(screen.getByRole('button', { name: /cancel/i }))
     expect(screen.queryByLabelText(/new password/i)).not.toBeInTheDocument()
+  })
+})
+
+// ─── Cost column ──────────────────────────────────────────────────────────────
+
+// ─── Outlier flag ─────────────────────────────────────────────────────────────
+
+describe('StudentDetail — outlier flag', () => {
+  it('renders the "Outlier — review" chip on the outlier session row only', async () => {
+    render(<StudentDetail />)
+    await waitFor(() => screen.getByText('Suspiciously Perfect'))
+
+    const chips = screen.getAllByText(/outlier — review/i)
+    expect(chips).toHaveLength(1)
+    expect(screen.getByTestId('outlier-flag-sess-4')).toBeInTheDocument()
+    expect(screen.queryByTestId('outlier-flag-sess-1')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('outlier-flag-sess-2')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('outlier-flag-sess-3')).not.toBeInTheDocument()
+  })
+
+  it('chip tooltip explains the gap to the student\'s other sessions', async () => {
+    render(<StudentDetail />)
+    await waitFor(() => screen.getByText('Suspiciously Perfect'))
+
+    const chip = screen.getByTestId('outlier-flag-sess-4')
+    // Tooltip is on the `title` attribute — assert against that.
+    expect(chip.getAttribute('title')).toMatch(/100%/)
+    expect(chip.getAttribute('title')).toMatch(/25pts/)
+    expect(chip.getAttribute('title')).toMatch(/avg 75%/)
   })
 })
 

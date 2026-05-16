@@ -14,19 +14,56 @@ vi.mock('../../lib/AuthContext', () => ({
 
 let profileFetchCount = 0
 
+// Dates anchored relative to test-run "now" so the inactive / outlier filters
+// behave correctly regardless of when the test runs.
+const NOW = Date.now()
+const DAY_MS = 24 * 60 * 60 * 1000
+const isoDaysAgo = (n) => new Date(NOW - n * DAY_MS).toISOString()
+
 // Sessions with cost metrics: 60s Whisper + 500 input + 150 output tokens
 // Whisper: 60/60 * 0.006 = $0.006
 // GPT:     500 * 0.00000015 + 150 * 0.0000006 = $0.000075 + $0.00009 = $0.000165
 // Total per session: $0.006165
 // Two sessions → $0.012330
 const SESSION_WITH_COST = {
+  id: 'sess-aarav-1',
   student_id: 'student-1',
   score_accuracy: 85,
   score_wpm: 130,
-  created_at: '2026-04-27T10:00:00Z',
+  created_at: isoDaysAgo(2),
   whisper_duration_seconds: 60,
   llm_input_tokens: 500,
   llm_output_tokens: 150,
+}
+const SESSION_WITH_COST_2 = { ...SESSION_WITH_COST, id: 'sess-aarav-2', created_at: isoDaysAgo(1) }
+
+// Student-2: inactive (last session 30 days ago)
+const SESSION_IRIS = {
+  id: 'sess-iris-1',
+  student_id: 'student-2',
+  score_accuracy: 70,
+  score_wpm: 100,
+  created_at: isoDaysAgo(30),
+  whisper_duration_seconds: null, llm_input_tokens: null, llm_output_tokens: null,
+}
+
+// Student-4: 3 sessions, last one an outlier (100 vs prior ~60)
+const SESSION_SAM_1 = {
+  id: 'sess-sam-1',
+  student_id: 'student-4',
+  score_accuracy: 60,
+  score_wpm: 120,
+  created_at: isoDaysAgo(5),
+  whisper_duration_seconds: null, llm_input_tokens: null, llm_output_tokens: null,
+}
+const SESSION_SAM_2 = { ...SESSION_SAM_1, id: 'sess-sam-2', created_at: isoDaysAgo(3) }
+const SESSION_SAM_OUTLIER = {
+  id: 'sess-sam-outlier',
+  student_id: 'student-4',
+  score_accuracy: 100,
+  score_wpm: 140,
+  created_at: isoDaysAgo(1),
+  whisper_duration_seconds: null, llm_input_tokens: null, llm_output_tokens: null,
 }
 
 vi.mock('../../lib/supabase', () => ({
@@ -49,7 +86,12 @@ vi.mock('../../lib/supabase', () => ({
               order: () => {
                 profileFetchCount++
                 return Promise.resolve({
-                  data: [{ id: 'student-1', full_name: 'Aarav Shah', grade: '10' }],
+                  data: [
+                    { id: 'student-1', full_name: 'Aarav Shah', grade: '10', created_at: isoDaysAgo(30) },
+                    { id: 'student-2', full_name: 'Iris Inactive', grade: '12', created_at: isoDaysAgo(60) },
+                    { id: 'student-3', full_name: 'Nadia Newbie', grade: 'MBA', created_at: isoDaysAgo(5) },
+                    { id: 'student-4', full_name: 'Sam Suspicious', grade: '12', created_at: isoDaysAgo(20) },
+                  ],
                 })
               },
             }),
@@ -60,7 +102,11 @@ vi.mock('../../lib/supabase', () => ({
         return {
           select: () => ({
             in: () => Promise.resolve({
-              data: [SESSION_WITH_COST, SESSION_WITH_COST],
+              data: [
+                SESSION_WITH_COST, SESSION_WITH_COST_2,
+                SESSION_IRIS,
+                SESSION_SAM_1, SESSION_SAM_2, SESSION_SAM_OUTLIER,
+              ],
             }),
           }),
         }
@@ -200,7 +246,8 @@ describe('TeacherDashboard — summary stat chips', () => {
     render(<TeacherDashboard />)
     await waitFor(() => screen.getByText('Aarav Shah'))
     const chip = screen.getByTestId('stat-students')
-    expect(chip).toHaveTextContent('1')
+    // 4 students in the fixture (Aarav, Iris, Nadia, Sam)
+    expect(chip).toHaveTextContent('4')
     expect(chip).toHaveTextContent(/students/i)
   })
 
@@ -208,7 +255,8 @@ describe('TeacherDashboard — summary stat chips', () => {
     render(<TeacherDashboard />)
     await waitFor(() => screen.getByText('Aarav Shah'))
     const chip = screen.getByTestId('stat-sessions')
-    expect(chip).toHaveTextContent('2')
+    // 2 (Aarav) + 1 (Iris) + 3 (Sam) + 0 (Nadia) = 6
+    expect(chip).toHaveTextContent('6')
     expect(chip).toHaveTextContent(/sessions/i)
   })
 
@@ -216,16 +264,79 @@ describe('TeacherDashboard — summary stat chips', () => {
     render(<TeacherDashboard />)
     await waitFor(() => screen.getByText('Aarav Shah'))
     const chip = screen.getByTestId('stat-accuracy')
-    expect(chip).toHaveTextContent('85%')
+    // Aarav avg 85, Iris avg 70, Sam avg (60+60+100)/3 = 73. Mean of (85,70,73) = 76.
+    expect(chip).toHaveTextContent('76%')
     expect(chip).toHaveTextContent(/avg accuracy/i)
   })
 
   it('shows class-wide vocab mastery chip (now ungated by grade)', async () => {
     render(<TeacherDashboard />)
-    // Wait for the vocab fetch to resolve and update the chip — the
-    // student list loads first, but the vocab effect runs after.
-    await waitFor(() => expect(screen.getByTestId('stat-vocab')).toHaveTextContent('20%'))
+    // 2 mastered across the class / (4 students × 10 words total) = 5%.
+    await waitFor(() => expect(screen.getByTestId('stat-vocab')).toHaveTextContent('5%'))
     expect(screen.getByTestId('stat-vocab')).toHaveTextContent(/vocab mastery/i)
+  })
+})
+
+// ─── Needs Your Attention (Phase 2 reframe) ───────────────────────────────────
+
+describe('TeacherDashboard — Needs Your Attention', () => {
+  it('renders the Needs Your Attention section heading', async () => {
+    render(<TeacherDashboard />)
+    await waitFor(() => screen.getByText(/needs your attention/i))
+    expect(screen.getByText(/needs your attention/i)).toBeInTheDocument()
+  })
+
+  it('lists inactive students (last session > 7 days ago) as chips', async () => {
+    render(<TeacherDashboard />)
+    // Iris last session was 30 days ago — should appear under Inactive.
+    await waitFor(() => expect(screen.getByTestId('attention-inactive')).toBeInTheDocument())
+    expect(screen.getByTestId('attention-inactive')).toHaveTextContent(/iris inactive/i)
+    // Aarav (sessions 1-2 days ago) and Sam (1-5 days ago) must NOT appear here.
+    expect(screen.getByTestId('attention-inactive')).not.toHaveTextContent(/aarav/i)
+    expect(screen.getByTestId('attention-inactive')).not.toHaveTextContent(/sam/i)
+  })
+
+  it('lists never-started students (account > 2 days, zero sessions) as chips', async () => {
+    render(<TeacherDashboard />)
+    // Nadia: 5-day-old account, zero sessions — should appear under Never Started.
+    await waitFor(() => expect(screen.getByTestId('attention-never-started')).toBeInTheDocument())
+    expect(screen.getByTestId('attention-never-started')).toHaveTextContent(/nadia newbie/i)
+    // Iris has 1 session so she is "inactive" not "never started".
+    expect(screen.getByTestId('attention-never-started')).not.toHaveTextContent(/iris/i)
+  })
+
+  it('lists outlier-flagged sessions across all students', async () => {
+    render(<TeacherDashboard />)
+    // Sam's last session: 100% accuracy vs prior 60% mean → outlier.
+    await waitFor(() => expect(screen.getByTestId('attention-outliers')).toBeInTheDocument())
+    expect(screen.getByTestId('attention-outliers')).toHaveTextContent(/sam suspicious/i)
+    // Aarav's two sessions are 85% each — no outlier.
+    expect(screen.getByTestId('attention-outliers')).not.toHaveTextContent(/aarav/i)
+  })
+
+  it('clicking an inactive-student chip navigates to that student detail', async () => {
+    const user = userEvent.setup()
+    render(<TeacherDashboard />)
+    await waitFor(() => screen.getByTestId('attention-inactive'))
+    const irisChip = screen.getByRole('button', { name: /iris inactive/i })
+    await user.click(irisChip)
+    expect(mockNavigate).toHaveBeenCalledWith('/teacher/student/student-2')
+  })
+})
+
+// ─── Last Session red highlight ───────────────────────────────────────────────
+
+describe('TeacherDashboard — last session red highlight', () => {
+  it('renders the Iris last-session cell with red colour (>7 days)', async () => {
+    render(<TeacherDashboard />)
+    await waitFor(() => screen.getByTestId('last-session-cell-student-2'))
+    expect(screen.getByTestId('last-session-cell-student-2').className).toMatch(/text-red/)
+  })
+
+  it('renders the Aarav last-session cell without red colour (<7 days)', async () => {
+    render(<TeacherDashboard />)
+    await waitFor(() => screen.getByTestId('last-session-cell-student-1'))
+    expect(screen.getByTestId('last-session-cell-student-1').className).not.toMatch(/text-red/)
   })
 })
 

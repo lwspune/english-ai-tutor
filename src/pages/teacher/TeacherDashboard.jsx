@@ -1,9 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/AuthContext'
 import AddStudentModal from '../../components/AddStudentModal'
 import { computeSessionCost, formatCost } from '../../lib/costUtils'
+import { isOutlierSession } from '../../lib/anomalyFlag'
+
+const DAY_MS = 24 * 60 * 60 * 1000
+const INACTIVE_DAYS = 7
+const NEVER_STARTED_MIN_AGE_DAYS = 2
+const OUTLIER_WINDOW_DAYS = 14
 
 export default function TeacherDashboard() {
   const { profile, signOut } = useAuth()
@@ -22,6 +28,10 @@ export default function TeacherDashboard() {
   const [vocabByStudent, setVocabByStudent] = useState({})
   const [totalVocabWords, setTotalVocabWords] = useState(0)
   const [milestonesByStudent, setMilestonesByStudent] = useState({})
+  const [outlierFlags, setOutlierFlags] = useState([])
+  // Frozen "now" so the inactive/never-started filters stay deterministic
+  // and useMemo callbacks remain pure (react-hooks/purity).
+  const [loadedAt] = useState(() => Date.now())
 
   function copyCode() {
     navigator.clipboard.writeText(classCode)
@@ -68,7 +78,7 @@ export default function TeacherDashboard() {
       setLoading(true)
       const { data: studentProfiles } = await supabase
         .from('profiles')
-        .select('id, full_name, grade')
+        .select('id, full_name, grade, created_at')
         .eq('role', 'student')
         .order('full_name')
 
@@ -76,10 +86,11 @@ export default function TeacherDashboard() {
 
       const { data: sessionStats } = await supabase
         .from('sessions')
-        .select('student_id, score_accuracy, score_wpm, created_at, whisper_duration_seconds, llm_input_tokens, llm_output_tokens')
+        .select('id, student_id, score_accuracy, score_wpm, created_at, whisper_duration_seconds, llm_input_tokens, llm_output_tokens, passages(title)')
         .in('student_id', studentProfiles.map(s => s.id))
 
       const statsMap = {}
+      const sessionsByStudent = {}
       for (const s of sessionStats ?? []) {
         if (!statsMap[s.student_id]) statsMap[s.student_id] = { sessions: 0, totalAccuracy: 0, totalWpm: 0, lastSession: null, totalCost: null }
         statsMap[s.student_id].sessions++
@@ -92,7 +103,34 @@ export default function TeacherDashboard() {
         if (sessionCost !== null) {
           statsMap[s.student_id].totalCost = (statsMap[s.student_id].totalCost ?? 0) + sessionCost
         }
+        if (!sessionsByStudent[s.student_id]) sessionsByStudent[s.student_id] = []
+        sessionsByStudent[s.student_id].push(s)
       }
+
+      // Compute outlier-flagged sessions within the last OUTLIER_WINDOW_DAYS
+      // window. Uses the same anomalyFlag heuristic the StudentDetail chip
+      // uses, just aggregated across the class.
+      const outlierWindowStart = Date.now() - OUTLIER_WINDOW_DAYS * DAY_MS
+      const flags = []
+      for (const sid of Object.keys(sessionsByStudent)) {
+        const list = sessionsByStudent[sid]
+        const profile = studentProfiles.find(p => p.id === sid)
+        for (const s of list) {
+          if (new Date(s.created_at).getTime() < outlierWindowStart) continue
+          const { outlier, reason } = isOutlierSession(s, list)
+          if (outlier) {
+            flags.push({
+              sessionId: s.id,
+              studentId: sid,
+              studentName: profile?.full_name ?? 'Unknown',
+              passageTitle: s.passages?.title ?? 'Untitled',
+              accuracy: s.score_accuracy,
+              reason,
+            })
+          }
+        }
+      }
+      setOutlierFlags(flags)
 
       setStudents(studentProfiles.map(s => ({
         ...s,
@@ -106,6 +144,18 @@ export default function TeacherDashboard() {
     }
     loadStudents()
   }, [studentFetchTrigger])
+
+  // Derived: students inactive >7 days (had sessions, but lastSession is stale)
+  const inactiveStudents = useMemo(() => {
+    const threshold = loadedAt - INACTIVE_DAYS * DAY_MS
+    return students.filter(s => s.lastSession && new Date(s.lastSession).getTime() < threshold)
+  }, [students, loadedAt])
+
+  // Derived: students whose account is >2 days old but have zero sessions
+  const neverStartedStudents = useMemo(() => {
+    const threshold = loadedAt - NEVER_STARTED_MIN_AGE_DAYS * DAY_MS
+    return students.filter(s => s.sessions === 0 && s.created_at && new Date(s.created_at).getTime() < threshold)
+  }, [students, loadedAt])
 
   useEffect(() => {
     async function loadVocabStats() {
@@ -228,7 +278,82 @@ export default function TeacherDashboard() {
 
       {showAddStudent && <AddStudentModal onClose={handleModalClose} />}
 
-      <main className="max-w-4xl mx-auto px-4 py-6">
+      <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+        {/* Needs Your Attention — surfaces outliers, inactive, and never-started students */}
+        {students.length > 0 && (
+          <section className="bg-white rounded-2xl border border-slate-200 p-5">
+            <h2 className="text-base font-semibold text-slate-700 mb-4">Needs Your Attention</h2>
+            <div className="space-y-4">
+              {/* Outlier sessions */}
+              <div data-testid="attention-outliers">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                  Outlier sessions ({outlierFlags.length})
+                </p>
+                {outlierFlags.length === 0 ? (
+                  <p className="text-sm text-slate-400">No suspicious sessions in the last {OUTLIER_WINDOW_DAYS} days ✓</p>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {outlierFlags.map(f => (
+                      <button
+                        key={f.sessionId}
+                        onClick={() => navigate(`/teacher/student/${f.studentId}`)}
+                        title={f.reason}
+                        className="text-xs px-2.5 py-1 bg-amber-50 text-amber-900 border border-amber-200 rounded-full hover:bg-amber-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                      >
+                        {f.studentName} · {f.passageTitle} · {f.accuracy}%
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Inactive students */}
+              <div data-testid="attention-inactive">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                  Inactive &gt;{INACTIVE_DAYS} days ({inactiveStudents.length})
+                </p>
+                {inactiveStudents.length === 0 ? (
+                  <p className="text-sm text-slate-400">Everyone active ✓</p>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {inactiveStudents.map(s => (
+                      <button
+                        key={s.id}
+                        onClick={() => navigate(`/teacher/student/${s.id}`)}
+                        className="text-xs px-2.5 py-1 bg-orange-50 text-orange-800 border border-orange-200 rounded-full hover:bg-orange-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400"
+                      >
+                        {s.full_name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Never-started students */}
+              <div data-testid="attention-never-started">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                  Never started ({neverStartedStudents.length})
+                </p>
+                {neverStartedStudents.length === 0 ? (
+                  <p className="text-sm text-slate-400">Everyone onboarded ✓</p>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {neverStartedStudents.map(s => (
+                      <button
+                        key={s.id}
+                        onClick={() => navigate(`/teacher/student/${s.id}`)}
+                        className="text-xs px-2.5 py-1 bg-red-50 text-red-800 border border-red-200 rounded-full hover:bg-red-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
+                      >
+                        {s.full_name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
+
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-semibold text-slate-700">Class Performance</h2>
           <button
@@ -296,6 +421,7 @@ export default function TeacherDashboard() {
                     {students.map((s, i) => {
                       const vocabMastered = vocabByStudent[s.id] ?? 0
                       const milestoneCount = milestonesByStudent[s.id] ?? 0
+                      const isInactive = s.lastSession && (loadedAt - new Date(s.lastSession).getTime()) > INACTIVE_DAYS * DAY_MS
                       return (
                       <tr
                         key={s.id}
@@ -324,7 +450,10 @@ export default function TeacherDashboard() {
                             ? <span className="text-indigo-600 font-semibold">{milestoneCount}</span>
                             : <span className="text-slate-300">0</span>}
                         </td>
-                        <td className="px-3 py-3 text-center text-slate-400 text-xs whitespace-nowrap">
+                        <td
+                          data-testid={`last-session-cell-${s.id}`}
+                          className={`px-3 py-3 text-center text-xs whitespace-nowrap ${isInactive ? 'text-red-500 font-semibold' : 'text-slate-400'}`}
+                        >
                           {s.lastSession ? new Date(s.lastSession).toLocaleDateString() : '—'}
                         </td>
                         <td className="px-3 py-3 text-center text-xs font-mono text-slate-600 whitespace-nowrap">

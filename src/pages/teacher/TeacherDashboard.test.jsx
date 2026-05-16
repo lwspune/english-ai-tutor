@@ -94,6 +94,8 @@ vi.mock('../../lib/supabase', () => ({
                   ],
                 })
               },
+              // Pulse-strip query: count students with last_reminder_sent within 7d
+              gte: () => Promise.resolve({ count: 3, error: null }),
             }),
           }),
         }
@@ -108,6 +110,16 @@ vi.mock('../../lib/supabase', () => ({
                 SESSION_SAM_1, SESSION_SAM_2, SESSION_SAM_OUTLIER,
               ],
             }),
+            // Pulse-strip query: count sessions within 7d
+            gte: () => Promise.resolve({ count: 5, error: null }),
+          }),
+        }
+      }
+      if (table === 'drill_attempts') {
+        return {
+          select: () => ({
+            // Pulse-strip query: count drills within 7d
+            gte: () => Promise.resolve({ count: 11, error: null }),
           }),
         }
       }
@@ -144,6 +156,8 @@ vi.mock('../../lib/supabase', () => ({
               ],
               error: null,
             }),
+            // Pulse-strip query: count milestones within 7d
+            gte: () => Promise.resolve({ count: 7, error: null }),
           }),
         }
       }
@@ -274,6 +288,24 @@ describe('TeacherDashboard — summary stat chips', () => {
     // 2 mastered across the class / (4 students × 10 words total) = 5%.
     await waitFor(() => expect(screen.getByTestId('stat-vocab')).toHaveTextContent('5%'))
     expect(screen.getByTestId('stat-vocab')).toHaveTextContent(/vocab mastery/i)
+  })
+})
+
+// ─── Weekly pulse strip (Phase 3) ─────────────────────────────────────────────
+
+describe('TeacherDashboard — weekly pulse strip', () => {
+  it('renders the This Week section heading', async () => {
+    render(<TeacherDashboard />)
+    await waitFor(() => screen.getByText(/this week/i))
+    expect(screen.getByText(/this week/i)).toBeInTheDocument()
+  })
+
+  it('shows pulse counts from the four count queries', async () => {
+    render(<TeacherDashboard />)
+    await waitFor(() => expect(screen.getByTestId('pulse-sessions')).toHaveTextContent('5'))
+    expect(screen.getByTestId('pulse-drills')).toHaveTextContent('11')
+    expect(screen.getByTestId('pulse-milestones')).toHaveTextContent('7')
+    expect(screen.getByTestId('pulse-reminders')).toHaveTextContent('3')
   })
 })
 

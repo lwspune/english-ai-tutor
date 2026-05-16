@@ -29,6 +29,7 @@ export default function TeacherDashboard() {
   const [totalVocabWords, setTotalVocabWords] = useState(0)
   const [milestonesByStudent, setMilestonesByStudent] = useState({})
   const [outlierFlags, setOutlierFlags] = useState([])
+  const [pulse, setPulse] = useState(null)
   // Frozen "now" so the inactive/never-started filters stay deterministic
   // and useMemo callbacks remain pure (react-hooks/purity).
   const [loadedAt] = useState(() => Date.now())
@@ -145,6 +146,26 @@ export default function TeacherDashboard() {
     loadStudents()
   }, [studentFetchTrigger])
 
+  // Pulse strip — weekly class activity counts
+  useEffect(() => {
+    async function loadPulse() {
+      const weekAgoIso = new Date(loadedAt - 7 * DAY_MS).toISOString()
+      const [sessionsR, drillsR, milestonesR, remindersR] = await Promise.all([
+        supabase.from('sessions').select('*', { count: 'exact', head: true }).gte('created_at', weekAgoIso),
+        supabase.from('drill_attempts').select('*', { count: 'exact', head: true }).gte('created_at', weekAgoIso),
+        supabase.from('milestones').select('*', { count: 'exact', head: true }).gte('achieved_at', weekAgoIso),
+        supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'student').gte('last_reminder_sent', weekAgoIso),
+      ])
+      setPulse({
+        sessions: sessionsR.count ?? 0,
+        drills: drillsR.count ?? 0,
+        milestones: milestonesR.count ?? 0,
+        reminders: remindersR.count ?? 0,
+      })
+    }
+    loadPulse()
+  }, [loadedAt])
+
   // Derived: students inactive >7 days (had sessions, but lastSession is stale)
   const inactiveStudents = useMemo(() => {
     const threshold = loadedAt - INACTIVE_DAYS * DAY_MS
@@ -226,17 +247,20 @@ export default function TeacherDashboard() {
         </div>
       </header>
 
-      {/* Controls strip: nav links + settings */}
-      <div className="bg-white border-b border-slate-100 px-4 py-2 flex items-center gap-4 flex-wrap">
-        <button onClick={() => navigate('/teacher/passages')} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">Manage Passages</button>
-        <button onClick={() => navigate('/teacher/completion')} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">Passage Completion</button>
-        <button onClick={() => navigate('/teacher/audio-review')} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">Audio Review</button>
-        <button onClick={() => navigate('/teacher/waitlist')} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">Waitlist</button>
-        <div className="h-4 w-px bg-slate-200 mx-1 hidden sm:block" />
+      {/* Nav row — pages */}
+      <nav className="bg-white border-b border-slate-100 px-4 py-2.5 flex items-center gap-6 flex-wrap" aria-label="Teacher sections">
+        <button onClick={() => navigate('/teacher/passages')} className="text-sm text-slate-600 hover:text-indigo-700 font-medium transition-colors">Manage Passages</button>
+        <button onClick={() => navigate('/teacher/completion')} className="text-sm text-slate-600 hover:text-indigo-700 font-medium transition-colors">Passage Completion</button>
+        <button onClick={() => navigate('/teacher/audio-review')} className="text-sm text-slate-600 hover:text-indigo-700 font-medium transition-colors">Audio Review</button>
+        <button onClick={() => navigate('/teacher/waitlist')} className="text-sm text-slate-600 hover:text-indigo-700 font-medium transition-colors">Waitlist</button>
+      </nav>
+
+      {/* Settings row — class-wide toggles */}
+      <div className="bg-slate-50 border-b border-slate-100 px-4 py-2 flex items-center gap-3 flex-wrap">
         {classCode && (
           <button
             onClick={copyCode}
-            className="flex items-center gap-1.5 text-xs font-mono bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1.5 rounded-lg transition-colors"
+            className="flex items-center gap-1.5 text-xs font-mono bg-white hover:bg-slate-100 text-slate-700 px-2.5 py-1.5 rounded-lg border border-slate-200 transition-colors"
             aria-label="Copy class code"
           >
             <span className="text-slate-400 font-sans">Code:</span>
@@ -245,19 +269,19 @@ export default function TeacherDashboard() {
           </button>
         )}
         {dailyLimit !== null && (
-          <div className="flex items-center gap-1.5" aria-label="Daily passage limit per student">
+          <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-lg px-2.5 py-1" aria-label="Daily passage limit per student">
             <span className="text-xs text-slate-500">Daily limit:</span>
             <button
               onClick={() => updateDailyLimit(dailyLimit - 1)}
               disabled={dailyLimit <= 1 || updatingLimit}
-              className="w-7 h-7 flex items-center justify-center rounded-md border border-slate-300 text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+              className="w-6 h-6 flex items-center justify-center rounded-md text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
               aria-label="Decrease daily limit"
             >−</button>
             <span className="w-5 text-center text-sm font-semibold text-slate-800">{dailyLimit}</span>
             <button
               onClick={() => updateDailyLimit(dailyLimit + 1)}
               disabled={dailyLimit >= 20 || updatingLimit}
-              className="w-7 h-7 flex items-center justify-center rounded-md border border-slate-300 text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+              className="w-6 h-6 flex items-center justify-center rounded-md text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
               aria-label="Increase daily limit"
             >+</button>
           </div>
@@ -349,6 +373,31 @@ export default function TeacherDashboard() {
                     ))}
                   </div>
                 )}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* This Week — pulse strip of weekly activity */}
+        {pulse && (
+          <section>
+            <h2 className="text-base font-semibold text-slate-700 mb-3">This Week</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div data-testid="pulse-sessions" className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
+                <p className="text-2xl font-bold text-slate-800">{pulse.sessions}</p>
+                <p className="text-xs text-slate-500 mt-1">Sessions</p>
+              </div>
+              <div data-testid="pulse-drills" className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
+                <p className="text-2xl font-bold text-slate-800">{pulse.drills}</p>
+                <p className="text-xs text-slate-500 mt-1">Drills</p>
+              </div>
+              <div data-testid="pulse-milestones" className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
+                <p className="text-2xl font-bold text-slate-800">{pulse.milestones}</p>
+                <p className="text-xs text-slate-500 mt-1">Milestones</p>
+              </div>
+              <div data-testid="pulse-reminders" className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
+                <p className="text-2xl font-bold text-slate-800">{pulse.reminders}</p>
+                <p className="text-xs text-slate-500 mt-1">Reminders Sent</p>
               </div>
             </div>
           </section>
